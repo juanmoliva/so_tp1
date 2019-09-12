@@ -7,13 +7,14 @@
 
 int main(int argc, char *argv[])
 {
-	// argv[1] should be an int
+	// argv[1] is the initial number of files the slave will receive, argv[2] is the slave's identifier
     int initial_files = atoi(argv[1]);
+    int identifier = atoi(argv[2]);
 
-    printf("hello from slave , %d files to receive.\n", initial_files );
+    printf("hello from slave , %d files to receive. My identifier is %d \n", initial_files, identifier );
 
     char fifo_path[32];
-    sprintf(fifo_path, "/tmp/fifo-%d", getpid());
+    sprintf(fifo_path, "/tmp/fifo-%d", identifier);
 
     int fd  = open(fifo_path, O_RDONLY);
     char buf[1024];
@@ -24,4 +25,5 @@ int main(int argc, char *argv[])
     close(fd);
 
     return 0;
+    
 }

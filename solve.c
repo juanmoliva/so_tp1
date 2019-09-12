@@ -25,14 +25,25 @@ int main(int argc, char *argv[])
     }
     */
 
+
+
+    // make fifos
+    for(int i = 0; i < NUM_SLAVES ; i++) {
+        char fifo_path[32];
+        sprintf(fifo_path, "/tmp/fifo-%d", i);
+        mkfifo(fifo_path, 0666);
+    }
+
+
 	// create NUM_SLAVES slaves
 	pid_t pid;
 	pid_t slaves_pids[5];
 	pid = fork();
+    int j = 0;
 
-	for(int i=0;pid != 0 && i< NUM_SLAVES - 1 ;i++)
+	for(;pid != 0 && j< NUM_SLAVES - 1 ;j++)
     { 
-    	slaves_pids[i] = pid;
+    	slaves_pids[j] = pid;
         pid = fork();
     } 
 
@@ -42,30 +53,26 @@ int main(int argc, char *argv[])
     	// padre
         slaves_pids[NUM_SLAVES-1] = pid; 
 
-        // make fifos
+        // write to FIFO's
         for(int i = 0; i < NUM_SLAVES ; i++) {
-            char* buffs_1 = "messsage_1";
+            char buff[32];
+            sprintf(buff, "messsage-%d", i);
             char fifo_path[32];
-            sprintf(fifo_path, "/tmp/fifo-%d", slaves_pids[i]);
-            mkfifo(fifo_path, 0666);
+            sprintf(fifo_path, "/tmp/fifo-%d", i);
             fd_fifos[i] = open(fifo_path, O_WRONLY);
-            write(fd_fifos[i], buffs_1, sizeof(buffs_1));
+            write(fd_fifos[i], buff, sizeof(buff));
             close(fd_fifos[i]);
         }
-
-    }
-
-    if ( pid == 0 ){
+    } else {
         // a slave
-        char *args_slave[]={"./slave",INITIAL_FILES_FOR_SLAVE, NULL}; 
+        char j_char[32];
+        sprintf(j_char, "%d", j);
+        char *args_slave[]={ "./slave" , INITIAL_FILES_FOR_SLAVE , j_char , NULL}; 
         printf("exec executed.\n");
         execvp(args_slave[0],args_slave); 
         printf("problem with exec\n");
         return 2;
     }
-
-    char* buffs_1 = "messsage 1";
-    char* buffs_2 = "messsage 2";
 
 	// distribute initial files to slaves
 
