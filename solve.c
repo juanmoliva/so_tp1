@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
         char fifo_path_parent[32], fifo_path_slave[32];
 	    //Le ponemos el nombre y creamos al pipe del parent
         sprintf(fifo_path_parent, "/tmp/fifo-parent-%d", i);
+	    //CREA EL PIPE
         mkfifo(fifo_path_parent, 0666);
 	    //Idem para slave
         sprintf(fifo_path_slave, "/tmp/fifo-slave-%d", i);
@@ -62,35 +63,44 @@ int main(int argc, char *argv[])
 		pid = fork();
 	 } 
 	
-
+//Un arreglo donde guardamos los file descriptors (un numero x cada archivo) -> el numero es lo q devuelve open, es el numero q te dio el SO
     int fd_fifos[NUM_SLAVES];
 
 	
     if ( pid != 0 ) {
-	//ACA ENTRA SOLO EL PADRE
-	    
+	//ACA ENTRA SOLO EL PADRE Y LE MANDA LOS PATHS DE LOS ARCHIVOS A CADA SLAVE!!!!!!!!!!
+	    //Aca guardamos el ultimo pid q no se guardo en el ciclo for
         slaves_pids[NUM_SLAVES-1] = pid; 
 
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
-            //char buff[32];
-            // sprintf(buff, "messsage-%d", i);
+		//Armo el path para poder acceder al pipe indicado (creados arriba)
             char fifo_path[32];
             sprintf(fifo_path, "/tmp/fifo-parent-%d", i);
+		//Te devuelve el int donde tenes que escribir dps
             fd_fifos[i] = open(fifo_path, O_WRONLY);
-            // write(fd_fifos[i], buff, sizeof(buff));
+		
+												//linea de prueba
             char buf[] =  "./files/bart10.shuffled.cnf;./files/bart11.shuffled.cnf";
+		
+	   //Escribis en ese respectivo fd, lo que esta en buf con su respectivo tamaño
             write(fd_fifos[i], buf, sizeof(buf));
-           
+           //Cierro el archivo.
             close(fd_fifos[i]);
         }
-    } else {        // a slave
+    } else {        // SLAVES
+	    
+	    //CREO UN VECTOR DE CHAR CON SU RESPECTIVO ID x CADA SLAVE
         char j_char[32];
         sprintf(j_char, "%d", j);
+	    
+	    //Parametros para ejecutar en la consola de comandos
+	    //Aca los hijos se transforman en SLAVES y comienzan a resolver los archivos
         char *args_slave[]={ "./slave" , INITIAL_FILES_FOR_SLAVE , j_char , NULL}; 
-        printf("exec executed.\n");
+	    //1er Parametro: Nombre del archivo "./slave" .     2do Parametro: Array de strings q tenga todos los parametros
         execvp(args_slave[0],args_slave); 
+	    //si exec retorna significa que hubo un problema
         printf("problem with exec\n");
         return 2;
     }
