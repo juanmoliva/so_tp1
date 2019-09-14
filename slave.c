@@ -13,17 +13,23 @@ int main(int argc, char *argv[])
 
     printf("hello from slave , %d files to receive. My identifier is %d \n", initial_files, identifier );
 
-    char fifo_path[32];
-    sprintf(fifo_path, "/tmp/fifo-%d", identifier);
+    char fifo_parent_path[32], fifo_slave_path[32];
+    sprintf(fifo_parent_path, "/tmp/fifo-parent-%d", identifier);
+    sprintf(fifo_slave_path, "/tmp/fifo-slave-%d", identifier);
 
-    int fd  = open(fifo_path, O_RDONLY);
+    int fd  = open(fifo_parent_path, O_RDONLY);
     char buf[1024];
 
-    int n = read(fd, buf, sizeof(buf));
+    read(fd, buf, sizeof(buf));
 
     printf("message received from pid %d : %s\n", getpid(), buf );
+
     close(fd);
 
-    return 0;
+    int send_fd = open(fifo_slave_path, O_WRONLY);
+
+    close(send_fd);
     
+    return 0;
+
 }
