@@ -5,14 +5,23 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
-#define NUM_SLAVES 3
+#define NUM_SLAVES 1
 #define MAX_FILES 200
 #define INITIAL_FILES_FOR_SLAVE "2"
 
+
+/*
+    TO DO
+    // error handling
+    // falta aceptar los archivos por linea de comandos.
+*/    // accept dir/* , dir/file.cnf , file.cnf as parameters
+
+
+char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
+int current_file = 0;
+
 int main(int argc, char *argv[])
 {
-    // falta aceptar los archivos por linea de comandos.
-    // accept dir/* , dir/file.cnf , file.cnf as parameters
 
     /*if ( argc < 2 ) {
         printf("usage: solve [FILES] \n");
@@ -27,8 +36,7 @@ int main(int argc, char *argv[])
     }
     */
 
-    char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
-
+    
     // make fifos
     for(int i = 0; i < NUM_SLAVES ; i++) {
         char fifo_path_parent[32], fifo_path_slave[32];
@@ -60,12 +68,15 @@ int main(int argc, char *argv[])
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
-            char buff[32];
-            sprintf(buff, "messsage-%d", i);
+            //char buff[32];
+            // sprintf(buff, "messsage-%d", i);
             char fifo_path[32];
             sprintf(fifo_path, "/tmp/fifo-parent-%d", i);
             fd_fifos[i] = open(fifo_path, O_WRONLY);
-            write(fd_fifos[i], buff, sizeof(buff));
+            // write(fd_fifos[i], buff, sizeof(buff));
+            char buf[] =  "./files/bart10.shuffled.cnf;./files/bart11.shuffled.cnf";
+            write(fd_fifos[i], buf, sizeof(buf));
+           
             close(fd_fifos[i]);
         }
     } else {        // a slave
