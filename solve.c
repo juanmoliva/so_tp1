@@ -16,53 +16,58 @@
     // falta aceptar los archivos por linea de comandos.
 */    // accept dir/* , dir/file.cnf , file.cnf as parameters
 
-
+//Vector donde guardamos cada uno de los archivos [GLOBAL]
+//FALTA RECIBIRLOS POR LINEA DE COMANDO
 char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
+
+//Aca vamos marcando por que archivo vamos del vector
 int current_file = 0;
 
 int main(int argc, char *argv[])
 {
 
+//Esto no permite que corra SIN recibir parametros
     /*if ( argc < 2 ) {
         printf("usage: solve [FILES] \n");
         printf("files must be .cnf\n");
         return 1;
     }*/
-
-    /*
-    char *to_solve[MAX_FILES];
-    for( int i = 1 ; i < argc ; i++ ) {
-        char *to_solve[i-1] = argv[i];
-    }
-    */
-
-    
-    // make fifos
+	
+   
+//Make FIFOS -> Tienen un string que identifica cada pipe (esa es la diferencia con los pipes normales)
+//Creamos 2 pipes por cada esclavo para conectar padre a hijo y viceversa
+	//Les ponemos estos nombres para despues poder referenciarlos desde cada uno de los slaves
     for(int i = 0; i < NUM_SLAVES ; i++) {
         char fifo_path_parent[32], fifo_path_slave[32];
+	    //Le ponemos el nombre y creamos al pipe del parent
         sprintf(fifo_path_parent, "/tmp/fifo-parent-%d", i);
         mkfifo(fifo_path_parent, 0666);
+	    //Idem para slave
         sprintf(fifo_path_slave, "/tmp/fifo-slave-%d", i);
         mkfifo(fifo_path_slave, 0666);
     }
 
 
-	// create NUM_SLAVES slaves
+	// Create NUM_SLAVES slaves
 	pid_t pid;
 	pid_t slaves_pids[NUM_SLAVES];
+	//Creamos el primer slave
 	pid = fork();
-    int j = 0;
+	int j = 0;
 
+	//Creamos el resto de los slaves y guardamos sus respectivos pid's
 	for(;pid != 0 && j< NUM_SLAVES - 1 ;j++)
-    { 
-    	slaves_pids[j] = pid;
-        pid = fork();
-    } 
+	{ 
+		slaves_pids[j] = pid;
+		pid = fork();
+	 } 
+	
 
     int fd_fifos[NUM_SLAVES];
 
+	//ACA ENTRA SOLO EL PADRE
     if ( pid != 0 ) {
-    	// parent
+	    
         slaves_pids[NUM_SLAVES-1] = pid; 
 
         // write to FIFO's
