@@ -105,11 +105,14 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-
+//A PARTIR DE ACA LABURA SOLO EL PADRE
+	
     // open slave fifos for reading.
 	printf("Opening slave fifos\n");
+	//Aca se guardan los int que te da el "open" para poder leer.
     int fd_slaves[NUM_SLAVES];
-
+	
+//Abre todos los canales de LECTURA de los pipes donde le van a escribir los slaves
     for(int i= 0; i<NUM_SLAVES; i++) {
         char fifo_path[32];
         sprintf(fifo_path, "/tmp/fifo-slave-%d", i);
@@ -117,6 +120,9 @@ int main(int argc, char *argv[])
     }
 
     // use select() to read from multiple fd's without getting blocked.
+	
+	
+    
     int nfds = 0;
     fd_set rfds;
     struct timeval tv;
@@ -138,12 +144,17 @@ int main(int argc, char *argv[])
 
     if (retval == -1)
         perror("select()");
-    else if (retval)
+    else if (retval){
         printf("Data is available now.\n");
         /* FD_ISSET(0, &rfds) will be true. */
-    else
+	
+	//RECIBIMOS EL LABURO HECHO POR EL SLAVE Y SE LO PASAMOS A VISTA PARA Q LO IMPRIMA
+	//HAY Q DARLE MAS LABURO!!!!!!!!! AL SLAVE!!!!!!
+	
+    }
+    else{
         printf("No data within five seconds.\n");
-    
+    }
 
 
 
