@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     tv.tv_usec = 0;
 
 
-    retval = select(1, &rfds, NULL, NULL, &tv);
+    retval = select(nfds, &rfds, NULL, NULL, &tv);
 
     if (retval == -1)
         perror("select()");
