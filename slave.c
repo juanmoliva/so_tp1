@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 
     printf("%s\n", solved);
 
-    write(fifo_slave_path, solved, sizeof(solved));
+    write(sendfd, solved, sizeof(solved));
 
     close(send_fd);
 
