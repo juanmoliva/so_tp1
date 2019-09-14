@@ -65,8 +65,9 @@ int main(int argc, char *argv[])
 
     int fd_fifos[NUM_SLAVES];
 
-	//ACA ENTRA SOLO EL PADRE
+	
     if ( pid != 0 ) {
+	//ACA ENTRA SOLO EL PADRE
 	    
         slaves_pids[NUM_SLAVES-1] = pid; 
 
