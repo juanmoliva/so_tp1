@@ -33,7 +33,7 @@ int solveFile(char *file, char *solved ) {
 
 
 
-    ///////////////////////////////////////////////////// ???????? ///////////////////////////////////////////////////////////
+    ///////////////////////// En local_solved ESTÁ EL OUTPUT DE MINISAT y pid va a ser para el fork /////////////////////////////////
     pid_t pid;
     char local_solved[4096];
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,11 +91,18 @@ int solveFile(char *file, char *solved ) {
 
 
 
+    ////////////////////////////////////////// Entra si es el PADRE ////////////////////////////////////////////////////////////////
 
     else {
+        //Feedback de que funciona
         printf("exec will call minisat %s \n", file );
+
+        //El padre no escribe entonces lo cerramos
         close(link[1]);
+
+        //Lee del 1er Parametro la cantidad del 3er Parametro y lo guarda en el parametro del medio (tiene que ser un puntero)
         int nbytes = read(link[0], local_solved, sizeof(local_solved));
+
     /*//////
     ACA EN local_solved ESTÁ EL OUTPUT DE MINISAT
     habría que llamar una funcion que sea algo así:
@@ -112,7 +119,11 @@ int solveFile(char *file, char *solved ) {
         wait(NULL);
         return nbytes;
     }
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     return -1;
+
 }
 
 int main(int argc, char *argv[])
