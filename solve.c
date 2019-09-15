@@ -9,21 +9,27 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 1
-#define MAX_FILES 100
-#define INITIAL_FILES_FOR_SLAVE "2"
+#define NUM_SLAVES 2
+#define MAX_FILES 50
+#define INITIAL_FILES_FOR_SLAVE 3
 
 int ftruncate(int fd, off_t length);
 
 /*
     TO DO
     // error handling
-    
+    // falta aceptar los archivos por linea de comandos.
 */    // accept dir/* , dir/file.cnf , file.cnf as parameters
 
+//Vector donde guardamos cada uno de los archivos [GLOBAL]
+//FALTA RECIBIRLOS POR LINEA DE COMANDO
+
+//char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
+char *files[MAX_FILES];
 
 //Aca vamos marcando por que archivo vamos del vector
 int current_file = 0;
+int files_tosolve = 0;
 
 int main(int argc, char *argv[])
     {
@@ -34,38 +40,42 @@ int main(int argc, char *argv[])
             printf("files must be .cnf\n");
             return 1;
         }*/
-	
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Tomamos EL PATH DE LA CARPETA QUE CONTIENE LOS ARCHIVOS  ////////////////////////////////////////
 /////////////////////////////// x argv y guardamos los nombre de archivos en variable: files ////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-	struct dirent * pDirent;
-	DIR * pDir;
+    
+    struct dirent * pDirent;
+    DIR * pDir;
 
-	pDir = opendir (argv[1]);
+    pDir = opendir (argv[1]);
 
-	char * files[MAX_FILES];
+    char * files[MAX_FILES];
 
-	if (pDir == NULL) {
-		printf ("Cannot open directory '%s'\n", argv[1]);
-		return 1;
-	}
+    if (pDir == NULL) {
+        printf ("Cannot open directory '%s'\n", argv[1]);
+        return 1;
+    }
 
-	int i = 0;
+    int i = 0;
 
-	while ((pDirent = readdir(pDir)) != NULL) {
-		files[i] = malloc(50*sizeof(char));
-		strcpy(files[i++],pDirent->d_name);
-	}
+    while ((pDirent = readdir(pDir)) != NULL) {
+        files[i] = malloc(50*sizeof(char));
+        char *full_path = (char *) malloc(100*sizeof(char));
+        strcat(full_path,argv[1]);
+        strcat(full_path,pDirent->d_name);
+        strcpy(files[i++],full_path);
+        files_tosolve++;
+    }
 
 
-	closedir (pDir);
-	
+    closedir (pDir);
+    
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
+
     // comunicación y sincronización con el proceso vista.
     char shm_path[32], sem_path[32];
     sprintf(shm_path, "/shm-%d", getpid());
@@ -121,6 +131,19 @@ int main(int argc, char *argv[])
         mkfifo(fifo_path_slave, 0666);
     }
 
+    // armo los buffers iniciales que se enviaran a cada slave
+    char buf[NUM_SLAVES][1024];
+    for(int i = 0 ; i < NUM_SLAVES; i++){
+        for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
+            if(current_file < sizeof(files) ){
+                strcat(buf[i], files[current_file]);
+                strcat(buf[i],";");
+                current_file++;
+            }    
+        }
+        printf("we will send '%s' to slave %d \n", buf[i], i );
+    }
+
 
 	// Create NUM_SLAVES slaves
 	pid_t pid;
@@ -148,17 +171,17 @@ int main(int argc, char *argv[])
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
-		//Armo el path para poder acceder al pipe indicado (creados arriba)
+		    //Armo el path para poder acceder al pipe indicado (creados arriba)
             char fifo_path[32];
             sprintf(fifo_path, "/tmp/fifo-parent-%d", i);
-		//Te devuelve el int donde tenes que escribir dps
+
+		    //Te devuelve el int donde tenes que escribir dps
             fd_fifos[i] = open(fifo_path, O_WRONLY);
-		
-												//linea de prueba
-            char buf[] =  "./files/bart10.shuffled.cnf;./files/bart11.shuffled.cnf";
-		
-	   //Escribis en ese respectivo fd, lo que esta en buf con su respectivo tamaño
-            write(fd_fifos[i], buf, sizeof(buf));
+
+	       //Escribis en ese respectivo fd, lo que esta en buf con su respectivo tamaño
+            char buf_aux[1024];
+            strcpy(buf_aux, buf[i]);
+            write(fd_fifos[i], buf_aux, sizeof(buf[i]));
            //Cierro el archivo.
             close(fd_fifos[i]);
         }
@@ -167,10 +190,12 @@ int main(int argc, char *argv[])
 	    //CREO UN VECTOR DE CHAR CON SU RESPECTIVO ID x CADA SLAVE
         char j_char[32];
         sprintf(j_char, "%d", j);
+        char n_offiles[7];
+        sprintf(n_offiles,"%d", INITIAL_FILES_FOR_SLAVE);
 	    
 	    //Parametros para ejecutar en la consola de comandos
 	    //Aca los hijos se transforman en SLAVES y comienzan a resolver los archivos
-        char *args_slave[]={ "./slave" , INITIAL_FILES_FOR_SLAVE , j_char , NULL}; 
+        char *args_slave[]={ "./slave" , n_offiles , j_char , NULL}; 
 	    //1er Parametro: Nombre del archivo "./slave" .     2do Parametro: Array de strings q tenga todos los parametros
         execvp(args_slave[0],args_slave); 
 	    //si exec retorna significa que hubo un problema
