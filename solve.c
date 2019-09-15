@@ -9,7 +9,7 @@
 #include <string.h>
 #include <semaphore.h>
 #define NUM_SLAVES 1
-#define MAX_FILES 50
+#define MAX_FILES 100
 #define INITIAL_FILES_FOR_SLAVE "2"
 
 int ftruncate(int fd, off_t length);
@@ -17,12 +17,9 @@ int ftruncate(int fd, off_t length);
 /*
     TO DO
     // error handling
-    // falta aceptar los archivos por linea de comandos.
+    
 */    // accept dir/* , dir/file.cnf , file.cnf as parameters
 
-//Vector donde guardamos cada uno de los archivos [GLOBAL]
-//FALTA RECIBIRLOS POR LINEA DE COMANDO
-char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
 
 //Aca vamos marcando por que archivo vamos del vector
 int current_file = 0;
@@ -37,38 +34,32 @@ int main(int argc, char *argv[])
             return 1;
         }*/
 	
-	
-/////////////////////////////////////////// El bloque de IF de arriba se puede borrar ya que la solucion que puse aca abajo
-////////////////////////////////////contempla que si no hay parametros recibidos al correr el programa se puedan mandar dps
-/////////////////////////////////// COMO QUIERAN....
-
-	
-	
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////// Leemos Path desde Argumento ////////////////////////////////////////////////////////
+/////////////////////////////// Tomamos EL PATH DE LA CARPETA QUE CONTIENE LOS ARCHIVOS  ////////////////////////////////////////
+/////////////////////////////// x argv y guardamos los nombre de archivos en variable: files ////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	/* use ternary operator to open file given as argv[1] or read stdin */
-    FILE *fp = argc > 1 ? fopen (argv[1], "r") : stdin;
+	struct dirent * pDirent;
+	DIR * pDir;
 
-    if (!fp) {  /* validate file open for reading */
-        fprintf (stderr, "error: file open failed '%s'.\n", argv[1]);
-        return 1;
-    }
-    
-//	Lineas de testeo! Aca se puede visualizar cual es el argumento recibido -> Efectivamente es el PATH
-//     printf("%s\n", "Comenzando...");
-//     printf("%s\n", "El argumento recibido fue:");
-//     printf("%s\n", argv[1]);
+	pDir = opendir (argv[1]);
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////// Traemos los nombres de los archivos en la carpeta  ////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-   	 /* do your stuff here */ 
-	//AHORA DEBERIAMOS PODER ABRIR DE EL PATH RECIBIDO (Osea el path de la carpeta con todos los files) UNO POR UNOS LOS ARCHIVOS
+	char * files[MAX_FILES];
 
-    	if (fp != stdin) fclose (fp);   /* close file if not stdin */
+	if (pDir == NULL) {
+		printf ("Cannot open directory '%s'\n", argv[1]);
+		return 1;
+	}
+
+	int i = 0;
+
+	while ((pDirent = readdir(pDir)) != NULL) {
+		files[i] = malloc(50*sizeof(char));
+		strcpy(files[i++],pDirent->d_name);
+	}
+
+
+	closedir (pDir);
 	
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
