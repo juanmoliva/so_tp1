@@ -104,15 +104,22 @@ int main(int argc, char *argv[])
         strcat(solved, "\n");
     }
 
-    printf("final value of solved for slave %d is '%s'\n", identifier, solved );
-    /*while(1) {
+    int end = 0;
+    while(!end) {
         // a partir de acá el slave recibe los archivos de a uno
         char new_file[2048];
         write(send_fd, solved, sizeof(solved));
-        read(fd, new_file, sizeof(new_file));
-        // si se lee un mensaje especial hay que terminar el slave.
-        solveFile(new_file, solved);
-    }*/
+        int nbytes = read(fd, new_file, sizeof(new_file));
+        if (nbytes == -1) {
+            perror("read file on slave");
+            return 1;
+        } else if ( nbytes != 0 ){
+            solveFile(new_file, solved);
+        }
+        else {
+            end = 1;
+        }
+    }
 
     close(send_fd);
 
