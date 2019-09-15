@@ -38,6 +38,18 @@ int solveFile(char *file, char *solved ) {
         printf("exec will call minisat %s \n", file );
         close(link[1]);
         int nbytes = read(link[0], local_solved, sizeof(local_solved));
+	/*//////
+	ACA EN local_solved ESTÁ EL OUTPUT DE MINISAT
+	habría que llamar una funcion que sea algo así:
+	parse_output(local_solved);
+	y que deje la variable con esta info:
+		Nombre de archivo.
+		Cantidad de cláusulas
+		Cantidad de variables
+		Resultado (SAT | UNSAT)
+		Tiempo de procesamiento
+		ID del esclavo que lo procesó.
+	//////*/
         strncpy(solved, local_solved, sizeof(local_solved));
         wait(NULL);
         return nbytes;
