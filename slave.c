@@ -86,7 +86,14 @@ int main(int argc, char *argv[])
 
     printf("%s\n", solved);
 
-    write(sendfd, solved, sizeof(solved));
+    while(1) {
+        // a partir de acá el slave recibe los archivos de a uno
+        char new_file[2048];
+        write(send_fd, solved, sizeof(solved));
+        read(fd, new_file, sizeof(new_file));
+        // si se lee un mensaje especial hay que terminar el slave.
+        solveFile(new_file, solved);
+    }
 
     close(send_fd);
 

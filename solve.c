@@ -5,10 +5,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <string.h>
+#include <semaphore.h>
 #define NUM_SLAVES 1
-#define MAX_FILES 200
+#define MAX_FILES 50
 #define INITIAL_FILES_FOR_SLAVE "2"
 
+int ftruncate(int fd, off_t length);
 
 /*
     TO DO
@@ -24,26 +28,66 @@ char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","
 int current_file = 0;
 
 int main(int argc, char *argv[])
-{
+    {
 
-//Esto no permite que corra SIN recibir parametros
-    /*if ( argc < 2 ) {
-        printf("usage: solve [FILES] \n");
-        printf("files must be .cnf\n");
+    //Esto no permite que corra SIN recibir parametros
+        /*if ( argc < 2 ) {
+            printf("usage: solve [FILES] \n");
+            printf("files must be .cnf\n");
+            return 1;
+        }*/
+
+    // comunicación y sincronización con el proceso vista.
+    char shm_path[32], sem_path[32];
+    sprintf(shm_path, "/shm-%d", getpid());
+    sprintf(sem_path, "/sem-%d", getpid());
+
+    int fd_shm = shm_open(shm_path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd_shm == -1)
+    {
+        perror("open shm");
         return 1;
-    }*/
-	
-   
-//Make FIFOS -> Tienen un string que identifica cada pipe (esa es la diferencia con los pipes normales)
-//Creamos 2 pipes por cada esclavo para conectar padre a hijo y viceversa
-	//Les ponemos estos nombres para despues poder referenciarlos desde cada uno de los slaves
+    }
+
+    // aumentar tamaño de shared memory
+    int res_truncate = ftruncate(fd_shm, MAX_FILES * 1024);
+    if (res_truncate == -1)
+    {
+        perror("ftruncate");
+        return 1;
+        }
+    	
+    void *addr_shm = mmap(NULL, MAX_FILES * 1024, PROT_WRITE, MAP_SHARED, fd_shm, 0);
+    if (addr_shm == MAP_FAILED)
+    {
+        perror("mmap");
+        return 1;
+    }
+
+    char *str_shm = (char *)addr_shm;
+
+    // inicializamos el semaforo.
+    sem_t *sem_id = sem_open(sem_path, O_CREAT, 0600, 0);
+    if( sem_id == SEM_FAILED ){
+        perror("sem_open");
+        return 1;
+    }
+
+    strcpy(str_shm, "hello");
+
+    // imprimimos pid a stdout para el proceso vista
+    printf("%d\n", getpid() );
+
+    //Make FIFOS -> Tienen un string que identifica cada pipe (esa es la diferencia con los pipes normales)
+    //Creamos 2 pipes por cada esclavo para conectar padre a hijo y viceversa
+    	//Les ponemos estos nombres para despues poder referenciarlos desde cada uno de los slaves
     for(int i = 0; i < NUM_SLAVES ; i++) {
         char fifo_path_parent[32], fifo_path_slave[32];
-	    //Le ponemos el nombre y creamos al pipe del parent
+        //Le ponemos el nombre y creamos al pipe del parent
         sprintf(fifo_path_parent, "/tmp/fifo-parent-%d", i);
 	    //CREA EL PIPE
         mkfifo(fifo_path_parent, 0666);
-	    //Idem para slave
+        //Idem para slave
         sprintf(fifo_path_slave, "/tmp/fifo-slave-%d", i);
         mkfifo(fifo_path_slave, 0666);
     }
@@ -62,8 +106,8 @@ int main(int argc, char *argv[])
 		slaves_pids[j] = pid;
 		pid = fork();
 	 } 
-	
-//Un arreglo donde guardamos los file descriptors (un numero x cada archivo) -> el numero es lo q devuelve open, es el numero q te dio el SO
+    	
+    //Un arreglo donde guardamos los file descriptors (un numero x cada archivo) -> el numero es lo q devuelve open, es el numero q te dio el SO
     int fd_fifos[NUM_SLAVES];
 
 	
@@ -105,14 +149,14 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-//A PARTIR DE ACA LABURA SOLO EL PADRE
+    //A PARTIR DE ACA LABURA SOLO EL PADRE
 	
     // open slave fifos for reading.
 	printf("Opening slave fifos\n");
 	//Aca se guardan los int que te da el "open" para poder leer.
     int fd_slaves[NUM_SLAVES];
-	
-//Abre todos los canales de LECTURA de los pipes donde le van a escribir los slaves
+    	
+    //Abre todos los canales de LECTURA de los pipes donde le van a escribir los slaves
     for(int i= 0; i<NUM_SLAVES; i++) {
         char fifo_path[32];
         sprintf(fifo_path, "/tmp/fifo-slave-%d", i);
@@ -120,9 +164,7 @@ int main(int argc, char *argv[])
     }
 
     // use select() to read from multiple fd's without getting blocked.
-	
-	
-    
+    	
     int nfds = 0;
     fd_set rfds;
     struct timeval tv;
@@ -146,16 +188,24 @@ int main(int argc, char *argv[])
         perror("select()");
     else if (retval){
         printf("Data is available now.\n");
-        /* FD_ISSET(0, &rfds) will be true. */
-	
-	//RECIBIMOS EL LABURO HECHO POR EL SLAVE Y SE LO PASAMOS A VISTA PARA Q LO IMPRIMA
-	//HAY Q DARLE MAS LABURO!!!!!!!!! AL SLAVE!!!!!!
-	
+        for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
+            if(FD_ISSET(fd_slaves[i],&rfds)) {
+                // leer del pipe de esclavo el archivo resuelto
+                char slave_path[32], file[1024];
+                sprintf(slave_path,"/tmp/fifo-slave-%d", i);
+                read(fd_slaves[i], file, sizeof(file));
+                
+                
+                // pasar al proceso vista
+                strcat(str_shm, file);
+                sem_post(sem_id);
+            }
+        }
+
     }
     else{
         printf("No data within five seconds.\n");
     }
-
 
 
 
