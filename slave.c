@@ -29,12 +29,13 @@ int solveFile(char *file, char *solved ) {
         dup2 (link[1], STDOUT_FILENO);
         close(link[0]);
         close(link[1]);
-        char *args_slave[]={ "minisat" , "./files/bart10.shuffled.cnf" , NULL};
+        char *args_slave[]={ "minisat" , file , NULL};
         execvp(args_slave[0],args_slave); 
         perror("exec");
         return -1;
 
     } else {
+        printf("exec will call minisat %s \n", file );
         close(link[1]);
         int nbytes = read(link[0], local_solved, sizeof(local_solved));
         strncpy(solved, local_solved, sizeof(local_solved));
@@ -60,6 +61,7 @@ int main(int argc, char *argv[])
     char buf[1024];
 
     read(fd, buf, sizeof(buf));
+    printf("Im slave %d, I received '%s'", identifier, buf);
 
     close(fd);
 
@@ -69,6 +71,8 @@ int main(int argc, char *argv[])
     char *file = strtok (buf,";");
     while (file!= NULL){
         files_tosolve[current_files] = file;
+        printf("slave, %d, file %d, %s\n", identifier, current_files, files_tosolve[current_files] );
+        
         current_files++;
         file = strtok (NULL, ";");
     }
@@ -76,24 +80,27 @@ int main(int argc, char *argv[])
 
     char solved[8192];
 
+    printf("current_files %d\n",current_files );
     // solve the initial files.
-    for(; current_files > 0 ; current_files-- ){
+
+    while(current_files > 0) {
+        current_files--;
         char this_file[4096];
-        int nbytes = solveFile(files_tosolve[current_files], this_file);
+        printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
+        solveFile(files_tosolve[current_files], this_file);
         strcat(solved, this_file);
         strcat(solved, "\n");
     }
 
-    printf("%s\n", solved);
-
-    while(1) {
+    printf("final value of solved for slave %d is '%s'\n", identifier, solved );
+    /*while(1) {
         // a partir de acá el slave recibe los archivos de a uno
         char new_file[2048];
         write(send_fd, solved, sizeof(solved));
         read(fd, new_file, sizeof(new_file));
         // si se lee un mensaje especial hay que terminar el slave.
         solveFile(new_file, solved);
-    }
+    }*/
 
     close(send_fd);
 
