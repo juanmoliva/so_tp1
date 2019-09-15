@@ -65,7 +65,6 @@ int solveFile(char *file, char *solved ) {
 
 
     ////////////////////////////////////////// Entra si es el HIJO ////////////////////////////////////////////////////////////////
-
     if(pid == 0) {
 
         /* Seteamos para que el SLAVE devuelva lo mismo   
@@ -128,19 +127,25 @@ int solveFile(char *file, char *solved ) {
 
 int main(int argc, char *argv[])
 {
-    // argv[1] is the initial number of files the slave will receive, argv[2] is the slave's identifier
+    // argv[1] is the initial number of files the slave will receive
+    // argv[2] is the slave's identifier
     int initial_files = atoi(argv[1]);
     int identifier = atoi(argv[2]);
 
     printf("hello from slave , %d files to receive. My identifier is %d \n", initial_files, identifier );
 
+    // Asignamos respectivo id a los nombres del pipe
     char fifo_parent_path[32], fifo_slave_path[32];
     sprintf(fifo_parent_path, "/tmp/fifo-parent-%d", identifier);
     sprintf(fifo_slave_path, "/tmp/fifo-slave-%d", identifier);
 
+    // Abrimos pipe de lectura del padre y guardamos el int q devuelve
     int fd  = open(fifo_parent_path, O_RDONLY);
+
+    // Creamos un buffer
     char buf[1024];
 
+    // Guarda en buf lo que le escribio el padre
     read(fd, buf, sizeof(buf));
     printf("Im slave %d, I received '%s'", identifier, buf);
 
