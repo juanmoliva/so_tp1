@@ -100,18 +100,18 @@ int solveFile(char *file, char *solved ) {
         printf("exec will call minisat %s \n", file );
         close(link[1]);
         int nbytes = read(link[0], local_solved, sizeof(local_solved));
-	/*//////
-	ACA EN local_solved ESTÁ EL OUTPUT DE MINISAT
-	habría que llamar una funcion que sea algo así:
-	parse_output(local_solved);
-	y que deje la variable con esta info:
-		Nombre de archivo.
-		Cantidad de cláusulas
-		Cantidad de variables
-		Resultado (SAT | UNSAT)
-		Tiempo de procesamiento
-		ID del esclavo que lo procesó.
-	//////*/
+    /*//////
+    ACA EN local_solved ESTÁ EL OUTPUT DE MINISAT
+    habría que llamar una funcion que sea algo así:
+    parse_output(local_solved);
+    y que deje la variable con esta info:
+        Nombre de archivo.
+        Cantidad de cláusulas
+        Cantidad de variables
+        Resultado (SAT | UNSAT)
+        Tiempo de procesamiento
+        ID del esclavo que lo procesó.
+    //////*/
         strncpy(solved, local_solved, sizeof(local_solved));
         wait(NULL);
         return nbytes;
@@ -121,7 +121,7 @@ int solveFile(char *file, char *solved ) {
 
 int main(int argc, char *argv[])
 {
-	// argv[1] is the initial number of files the slave will receive, argv[2] is the slave's identifier
+    // argv[1] is the initial number of files the slave will receive, argv[2] is the slave's identifier
     int initial_files = atoi(argv[1]);
     int identifier = atoi(argv[2]);
 
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
     read(fd, buf, sizeof(buf));
     printf("Im slave %d, I received '%s'", identifier, buf);
 
-    close(fd);
+    
 
     // open fifo for writing
     int send_fd = open(fifo_slave_path, O_WRONLY);
@@ -166,17 +166,25 @@ int main(int argc, char *argv[])
         strcat(solved, "\n");
     }
 
-    printf("final value of solved for slave %d is '%s'\n", identifier, solved );
-    /*while(1) {
+    int end = 0;
+    while(!end) {
         // a partir de acá el slave recibe los archivos de a uno
         char new_file[2048];
         write(send_fd, solved, sizeof(solved));
-        read(fd, new_file, sizeof(new_file));
-        // si se lee un mensaje especial hay que terminar el slave.
-        solveFile(new_file, solved);
-    }*/
+        int nbytes = read(fd, new_file, sizeof(new_file));
+        if (nbytes == -1) {
+            perror("read file on slave");
+            return 1;
+        } else if ( nbytes != 0 ){
+            solveFile(new_file, solved);
+        }
+        else {
+            end = 1;
+        }
+    }
 
     close(send_fd);
+    close(fd);
 
     return 0;
 }
