@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <semaphore.h>
+#include <dirent.h>
 #define NUM_SLAVES 1
 #define MAX_FILES 100
 #define INITIAL_FILES_FOR_SLAVE "2"
