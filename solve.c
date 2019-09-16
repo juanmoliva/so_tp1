@@ -41,45 +41,31 @@ int main(int argc, char *argv[])
             return 1;
         }*/
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Tomamos EL PATH DE LA CARPETA QUE CONTIENE LOS ARCHIVOS  ////////////////////////////////////////
 /////////////////////////////// x argv y guardamos los nombre de archivos en variable: files ////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    //Variables para manejo de directorios
     struct dirent * pDirent;
     DIR * pDir;
 
-    //Abrimos el directorio 
     pDir = opendir (argv[1]);
 
-    //Creamos vector donde van a estar todos los PATHS ABSOLUTOS de los archivos a resolver
     char * files[MAX_FILES];
 
-    //Validamos que no de error
     if (pDir == NULL) {
         printf ("Cannot open directory '%s'\n", argv[1]);
         return 1;
     }
 
-
     int i = 0;
-    // readdir devuelve el primer archivo del directorio cada vez que se asigna
-    // Le asignamos a pDirent cada uno de los directorios en cada iteracion 
-    // y le agregamos lo recibido por argv para tener el full path
+
     while ((pDirent = readdir(pDir)) != NULL) {
-        //Asignamos lugar a los punteros pq tienen por default 10 (es poco)
         files[i] = malloc(50*sizeof(char));
         char *full_path = (char *) malloc(100*sizeof(char));
-
-        //Appendeamos el full path + name
         strcat(full_path,argv[1]);
         strcat(full_path,pDirent->d_name);
-
-        //Guardamos en files todos los caminos
         strcpy(files[i++],full_path);
-
-        //Contamos cuantos archivos tenemos por resolver
         files_tosolve++;
     }
 
@@ -146,8 +132,9 @@ int main(int argc, char *argv[])
     }
 
     // armo los buffers iniciales que se enviaran a cada slave
-    char buf[NUM_SLAVES][1024];
+    char *buf[NUM_SLAVES];
     for(int i = 0 ; i < NUM_SLAVES; i++){
+        buf[i] = (char *) malloc(1024*sizeof(char));
         for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
             if(current_file < sizeof(files) ){
                 strcat(buf[i], files[current_file]);
@@ -195,7 +182,7 @@ int main(int argc, char *argv[])
 	       //Escribis en ese respectivo fd, lo que esta en buf con su respectivo tamaño
             char buf_aux[1024];
             strcpy(buf_aux, buf[i]);
-            write(fd_fifos[i], buf_aux, sizeof(buf[i]));
+            write(fd_fifos[i], buf_aux, 1024*sizeof(char));
            //Cierro el archivo.
             close(fd_fifos[i]);
         }
