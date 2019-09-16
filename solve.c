@@ -9,7 +9,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 2
+#define NUM_SLAVES 3
 #define MAX_FILES 70
 #define INITIAL_FILES_FOR_SLAVE 2
 
@@ -159,11 +159,7 @@ int main(int argc, char *argv[])
     }*/
 
     for(int i = 0; i < NUM_SLAVES ; i++) {
-        int rem = remove(fifo_path[i]);
-        if( rem != 0 ) {
-            perror("remove");
-            return 1;
-        }
+        remove(fifo_path[i]);
         int res = mkfifo(fifo_path[i], 0666);
         if( res != 0 ) {
             perror("mkfifo");
@@ -294,10 +290,7 @@ int main(int argc, char *argv[])
     tv.tv_usec = 0;
 */
 
-    printf("antes del while current_file es %d y hay %d files\n", current_file,files_tosolve);
     while( current_file < files_tosolve ){
-
-        printf("en el while current_file es %d \n", current_file);
 
         retval = select(nfds, &rfds, NULL, NULL, NULL);
 
@@ -318,8 +311,8 @@ int main(int argc, char *argv[])
                     }
                     
                     // pasar al proceso vista
-                    printf("recibido en solve: %s\n", file );
-                    strcat(str_shm, file);
+                    printf("%s\n", file );
+                    strncat(str_shm, file, strlen(file));
                     sem_post(sem_id);
 
                     close(fd_fifos[i]);
@@ -384,7 +377,6 @@ int main(int argc, char *argv[])
 
         close(fd_fifos[i]);
     }
-
     
 
     return 0;
@@ -395,7 +387,7 @@ void set_fifo_paths() {
     char path[32];
     for( int i = 0 ; i < NUM_SLAVES ; i++ ){
         fifo_path[i] = (char *) malloc(32*sizeof(char));
-        sprintf(path,"/tmp/fifo-%d", i);
+        sprintf(path,"/tmp/fifos-%d", i);
         strcpy(fifo_path[i],path);
     }
 }

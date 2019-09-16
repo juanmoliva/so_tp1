@@ -21,88 +21,40 @@ char fifo_path[32];
 FILE *popen(const char *command, const char *type);
 int pclose(FILE *stream);
 
-void parse_output( char *solved);
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Resuelve el archivo - Le pasamos un puntero al archivo y un puntero para que deje la rta  //////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int solveFile(char *file, char *solved ) {
-     //////////////////////////////////////////// Preparamos el canal de escritura y lectura del pipe /////////////////////////////////
-     int link[2];
-     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-     
-     ///////////////////////// En local_solved ESTÁ EL OUTPUT DE MINISAT y pid va a ser para el fork /////////////////////////////////
-     pid_t pid;
-     char *local_solved= (char *)malloc( 8096 *sizeof(char) );
-     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-     
-     ////////////////////////////////////////// Crea el pipe y se fija si da error ////////////////////////////////////////////////////////////////
-     if (pipe(link)==-1) {
-         perror("pipe");
-         return -1;
-     }
-     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-     
-     ////////////////////////////////////////// Hace el FORK y se fija si da error ////////////////////////////////////////////////////////////////
-     if ((pid = fork()) == -1){
-         perror("fork");
-         return -1;
-     }
-     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    char pid[50], file_str[100];
+    sprintf(pid, "pid of the slave is %d\n", getpid());
+    sprintf(file_str, "the file '%s' was solved\n", file);
+    char command[200];
+    sprintf(command, "minisat %s | grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT' ", file);
+    FILE* fp;
+    char line[128];
+    unsigned int size=0;
+    printf("about to execute in %d : '%s'\n", getpid() ,command );
+    fp=popen(command,"r");
 
-     ////////////////////////////////////////// Entra si es el HIJO ////////////////////////////////////////////////////////////////
-     if(pid == 0) {
-         /* Seteamos para que el SLAVE devuelva lo mismo   
-         que devolvia en STDOUT a devolverlo en link[1] */
-         dup2 (link[1], STDOUT_FILENO);
-          // Cerramos ambos links 
-         close(link[0]);
-         close(link[1]);
-          // Armamos el parametro para pasarle a "execvp"
-         char *args_slave[]={ "minisat" , file , NULL};
-         execvp(args_slave[0],args_slave); 
-          
-          // Si el exec retorna significa que hubo un error 
-         perror("exec");
-         return -1;
+    strcat(solved, file_str);
+    strcat(solved,pid);
+    
+    while (fgets(line,sizeof(line),fp))
+        {
+        size+=strlen(line);
+        strcat(solved,line);
+        }
 
-     }
-     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-      ////////////////////////////////////////// Entra si es el PADRE ////////////////////////////////////////////////////////////////
-     else {
-         //Feedback de que funciona
-         //printf("exec will call minisat %s \n", file );
-         
-         //El padre no escribe entonces lo cerramos
-         close(link[1]);
-         
-         //Lee del 1er Parametro la cantidad del 3er Parametro y lo guarda en el parametro del medio (tiene que ser un puntero)
-         int nbytes = read(link[0], local_solved, 2048 *sizeof(char));
-    // /*//////
-    // ACA EN local_solved ESTÁ EL OUTPUT DE MINISAT
-    // habría que llamar una funcion que sea algo así:
-    // parse_output(local_solved);
-    // y que deje la variable con esta info:
-    //     Nombre de archivo.
-    //     Cantidad de cláusulas
-    //     Cantidad de variables
-    //     Resultado (SAT | UNSAT)
-    //     Tiempo de procesamiento
-    //     ID del esclavo que lo procesó.
-    // //////*/
-         parse_output(local_solved);
-         strcat(local_solved, file);
-
-         
-         strcpy(solved, local_solved);
-
-         wait(NULL);
-         return nbytes;
-     }
-     return -1;
+    fclose(fp);
+    
+    return 0;
 }
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -162,7 +114,7 @@ int main(int argc, char *argv[])
 
     while(current_files > 0) {
         current_files--;
-        char *this_file = (char *)malloc(2048*sizeof(char));
+        char *this_file = (char *)malloc(4048*sizeof(char));
         printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
         solveFile(files_tosolve[current_files], this_file);
         strcat(solved, this_file);
@@ -188,14 +140,13 @@ int main(int argc, char *argv[])
         }
 
         int read_res = read(fd, file_loop, 512);
-        printf("recibido en slave '%s'\n", file_loop);
+
         if (read_res == -1) {
             perror("read on slave in loop");
             return 1;
-        }
+        } 
 
-
-        if ( strcmp(file_loop,"END") ) {
+        if ( strcmp(file_loop,"END") == 0 ) {
             printf("in slave %d we reached termination\n", identifier);
             close(fd);
             break;
@@ -205,7 +156,6 @@ int main(int argc, char *argv[])
         // solve file read on fifo and send in on solved.
         solveFile(file_loop, solved_loop);
 
-        strcpy(solved_loop, "mensaje mandado de slave!");
         fd = open(fifo_path, O_WRONLY);
         if (fd == -1) {
             perror("open in slave loop");
@@ -242,26 +192,6 @@ int main(int argc, char *argv[])
 }
 
 void set_fifo_path( int identifier ) {
-    sprintf( fifo_path, "/tmp/fifo-%d", identifier );
-}
-
-void parse_output(char* solved) {
-    // popen = corre el primer parametro y crea un pipe entre el fork que hace para correrlo y el programa actual (aca), el segundo parametro
-    // es "r" que indica que voy a leer lo que me mande el fork (salida del minisat con egrep)
-    // devuelve un tipo FILE que tengo que pasar a *char para devolverlo en solved 
-    FILE *ff = popen("grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT'  local_solved", "r"); // me quedo con lo que me interesa, 
-    if (ff == NULL){ perror("popen"); return;}
-        FILE *faux = ff = fopen(ff, "r");  // con fopen abro el FILE que devuelve popen
-         while (fgets(solved, 8192 , faux) != EOF){ // con esto copio line por line de lo que tiene faux a solved
-             fclose(ff);
-         }
-
-        char pid[10];
-        sprintf(pid, "%d", getpid());
-        strcat(solved, pid); //copio el pid 
-        int status = pclose(ff); // cierro popen
-        if (status == -1) {     // manejo de error popen
-            perror("pclose");
-            return ;
-        }
+    sprintf( fifo_path, "/tmp/fifos-%d", identifier );
+    return;
 }

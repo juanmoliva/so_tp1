@@ -44,14 +44,6 @@ int main(void)
         return 1;
     }
 
-	printf("%s\n", vista_char_addr);
-
-	while(1) {
-		char new_file[1024];
-		strcpy(new_file, vista_char_addr + bytes_read);
-		bytes_read += strlen(new_file);
-		printf("%s\n", new_file) ;
-		sem_wait(sem_id);
-	}
+    printf("we got to vista\n");
 
 }
