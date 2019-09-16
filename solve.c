@@ -9,7 +9,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 3
+#define NUM_SLAVES 2
 #define MAX_FILES 70
 #define INITIAL_FILES_FOR_SLAVE 2
 
@@ -159,6 +159,11 @@ int main(int argc, char *argv[])
     }*/
 
     for(int i = 0; i < NUM_SLAVES ; i++) {
+        int rem = remove(fifo_path[i]);
+        if( rem != 0 ) {
+            perror("remove");
+            return 1;
+        }
         int res = mkfifo(fifo_path[i], 0666);
         if( res != 0 ) {
             perror("mkfifo");
@@ -363,6 +368,21 @@ int main(int argc, char *argv[])
        /* else{
             printf("No data received in return() within 30 seconds.\n");
         }*/
+    }
+
+    // terminacion
+    for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
+        close(fd_fifos[i]);
+        fd_fifos[i] = open(fifo_path[i], O_WRONLY);
+
+        char end[5] = "END";
+        int write_res = write(fd_fifos[i] , end,strlen(end));
+        if(write_res == -1) {
+            perror("write on termination");
+            return 1;
+        }
+
+        close(fd_fifos[i]);
     }
 
     
