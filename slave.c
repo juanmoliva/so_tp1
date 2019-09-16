@@ -7,12 +7,14 @@
 #include <string.h>
 #include <sys/wait.h>
 
+void set_fifo_path(int identifier);
+
 /////////////////////////////// Puntero a los archivos a resolver Y un contador  ////////////////////////////////////////
 char *files_tosolve[100];
 int current_files = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+char fifo_path[32];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Resuelve el archivo - Le pasamos un puntero al archivo y un puntero para que deje la rta  //////
@@ -98,27 +100,40 @@ int main(int argc, char *argv[])
     int initial_files = atoi(argv[1]);
     int identifier = atoi(argv[2]);
 
+    set_fifo_path(identifier);
+
     // printf("hello from slave , %d files to receive. My identifier is %d \n", initial_files, identifier );
 
-    // Asignamos respectivo id a los nombres del pipe
+    /*// Asignamos respectivo id a los nombres del pipe
     char fifo_parent_path[32], fifo_slave_path[32];
     sprintf(fifo_parent_path, "/tmp/fifo-parent-%d", identifier);
-    sprintf(fifo_slave_path, "/tmp/fifo-slave-%d", identifier);
+    sprintf(fifo_slave_path, "/tmp/fifo-slave-%d", identifier);*/
      
-    // Abrimos pipe de lectura del padre y guardamos el int q devuelve
-    int fd  = open(fifo_parent_path, O_RDONLY);
+    /*// Abrimos pipe de lectura del padre y guardamos el int q devuelve
+    int fd  = open(fifo_parent_path, O_RDONLY);*/
+
+    // abrimos fifo para lectura
+    int fd = open(fifo_path, O_RDONLY);
+    if ( fd == -1 ){
+        perror( "open fifo in slave");
+        return 1;
+    }
     
     // Creamos un buffer
     char buf[1024];
      
     // Guarda en buf lo que le escribio el padre
     read(fd, buf, sizeof(buf));
+
+
     // printf("Im slave %d, I received '%s'", identifier, buf);
 
-    
+    close(fd);
 
-    // open fifo for writing
-    int send_fd = open(fifo_slave_path, O_WRONLY);
+    /*// open fifo for writing
+    int send_fd = open(fifo_slave_path, O_WRONLY);*/
+
+    fd = open(fifo_path, O_WRONLY);
 
     char *file = strtok (buf,";");
     while (file!= NULL){
@@ -132,8 +147,6 @@ int main(int argc, char *argv[])
 
     char *solved = (char *)malloc(8096*sizeof(char));
 
-    printf("current_files %d\n",current_files );
-
     // solve the initial files.
 
     while(current_files > 0) {
@@ -145,12 +158,49 @@ int main(int argc, char *argv[])
         strcat(solved, "\n");
     }
 
+    int res = write(fd, solved, strlen(solved));
+    if ( res == -1 ){
+        perror("write in slave");
+        return 1;
+    }
+
+    close(fd);
+
+    char file_loop[512], solved_loop[512];
     int end = 0;
     while(!end) {
         // a partir de acá el slave recibe los archivos de a uno
-        char *new_file = (char *)malloc(2048*sizeof(char));
-        char test_buf[50] = "mensaje mandado de slave!";
-        // write(send_fd, solved, 8096*sizeof(char));
+        fd = open(fifo_path, O_RDONLY);
+        if (fd == -1) {
+            perror("open in slave loop");
+            return -1;
+        }
+
+        int read_res = read(fd, file_loop, 512);
+        if (read_res == -1) {
+            perror("read on slave in loop");
+            return 1;
+        }
+        close(fd);
+
+        // solve file read on fifo and send in on solved.
+
+        strcpy(solved_loop, "mensaje mandado de slave!");
+        fd = open(fifo_path, O_WRONLY);
+        if (fd == -1) {
+            perror("open in slave loop");
+            return -1;
+        }
+
+        int write_res = write(fd, solved_loop, strlen(solved_loop));
+        if(write_res == -1) {
+            perror("write on slave in loop");
+            return 1;
+        }
+
+        close(fd);
+
+        /*// write(send_fd, solved, 8096*sizeof(char));
         write(send_fd, test_buf, 50);
         int nbytes = read(fd, new_file, 2048*sizeof(char));
         if (nbytes == -1) {
@@ -158,14 +208,19 @@ int main(int argc, char *argv[])
             return 1;
         } else if ( nbytes != 0 ){
             solveFile(new_file, solved);
-        }/*
+        }*/
+        /*
         else {
             end = 1;
         }*/
     }
 
-    close(send_fd);
+
     close(fd);
 
     return 0;
+}
+
+void set_fifo_path( int identifier ) {
+    sprintf( fifo_path, "/tmp/fifo-%d", identifier );
 }
