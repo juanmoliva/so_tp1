@@ -32,7 +32,7 @@ int solveFile(char *file, char *solved ) {
     sprintf(pid, "pid of the slave is %d\n", getpid());
     sprintf(file_str, "the file '%s' was solved\n", file);
     char command[200];
-    sprintf(command, "minisat %s | grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT' ", file);
+    sprintf(command, "minisat %s | grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT' 2>/dev/null", file);
     FILE* fp;
     char line[128];
     unsigned int size=0;
@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
     char file_loop[512], solved_loop[512];
     int end = 0;
     while(!end) {
+
         // a partir de acá el slave recibe los archivos de a uno
         fd = open(fifo_path, O_RDONLY);
         if (fd == -1) {

@@ -290,6 +290,7 @@ int main(int argc, char *argv[])
     tv.tv_usec = 0;
 */
 
+    printf("nfds es %d\n", nfds);
     while( current_file < files_tosolve ){
 
         retval = select(nfds, &rfds, NULL, NULL, NULL);
@@ -301,10 +302,11 @@ int main(int argc, char *argv[])
         else if (retval){
             for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
                 if(FD_ISSET(fd_fifos[i],&rfds)) {
+                    printf("despues del select, el slave %d esta disponible\n", i);
                     // leer del pipe de esclavo el archivo resuelto
-                    char *file = (char*) malloc(1024*sizeof(char));
+                    char *file = (char*) malloc(2048*sizeof(char));
 
-                    int read_res = read(fd_fifos[i], file, 1024*sizeof(char));
+                    int read_res = read(fd_fifos[i], file, 2048*sizeof(char));
                     if(read_res == -1) {
                         perror("read on select");
                         return 1;
@@ -329,38 +331,17 @@ int main(int argc, char *argv[])
                     close(fd_fifos[i]);
                     fd_fifos[i] = open(fifo_path[i], O_RDONLY);
 
+                    FD_ZERO(&rfds);
+                    for(int i = 0 ; i < NUM_SLAVES ; i++) {
+                        if(fd_fifos[i] > nfds) nfds = fd_fifos[i];
+                        FD_SET(fd_fifos[i], &rfds);
+                    }
+
 
                 }
-
-                /*if(FD_ISSET(fd_slaves[i],&rfds)) {
-                    // leer del pipe de esclavo el archivo resuelto
-                    char slave_path[32], parent_path[32];
-                    char *file = (char*) malloc(1024*sizeof(char));
-                    sprintf(slave_path,"/tmp/fifo-slave-%d", i);
-                    sprintf(parent_path,"/tmp/fifo-parent-%d", i);
-
-                    read(fd_slaves[i], file, 1024*sizeof(char));
-                    
-                    
-                    // pasar al proceso vista
-                    printf("recibido en solve: %s\n", file );
-                    strcat(str_shm, file);
-                    sem_post(sem_id);
-
-                    int fd = open(parent_path, O_WRONLY);
-                    write(fd, files[current_file],100*sizeof(char));
-                    current_file++;
-
-                    close(fd);
-
-
-                }*/
             }
 
         }
-       /* else{
-            printf("No data received in return() within 30 seconds.\n");
-        }*/
     }
 
     // terminacion
