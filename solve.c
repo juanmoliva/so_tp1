@@ -9,7 +9,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 2
+#define NUM_SLAVES 5
 #define MAX_FILES 50
 #define INITIAL_FILES_FOR_SLAVE 3
 
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
         // buf[i] = (char *) malloc(1024*sizeof(char));
 
         for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
-            if(current_file < sizeof(files) ){
+            if(current_file < files_tosolve ){
                 strcat(buf[i], files[current_file]);
                 strcat(buf[i],";");
                 current_file++;
@@ -254,34 +254,45 @@ int main(int argc, char *argv[])
     tv.tv_sec = 30;
     tv.tv_usec = 0;
 
+    while( current_file < files_tosolve ){
+        retval = select(nfds, &rfds, NULL, NULL, &tv);
 
-    retval = select(nfds, &rfds, NULL, NULL, &tv);
-
-    if (retval == -1)
-        perror("select()");
-    else if (retval){
-        printf("Data is available now.\n");
-        for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
-            if(FD_ISSET(fd_slaves[i],&rfds)) {
-                // leer del pipe de esclavo el archivo resuelto
-                char slave_path[32], file[1024];
-                sprintf(slave_path,"/tmp/fifo-slave-%d", i);
-                read(fd_slaves[i], file, sizeof(file));
-                
-                
-                // pasar al proceso vista
-                printf("recibido en solve: %s\n", file );
-                strcat(str_shm, file);
-                sem_post(sem_id);
-            }
+        if (retval == -1) {
+            perror("select()");
+            return 1;
         }
+        else if (retval){
+            for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
+                if(FD_ISSET(fd_slaves[i],&rfds)) {
+                    // leer del pipe de esclavo el archivo resuelto
+                    char slave_path[32], parent_path[32];
+                    char *file = (char*) malloc(1024*sizeof(char));
+                    sprintf(slave_path,"/tmp/fifo-slave-%d", i);
+                    sprintf(parent_path,"/tmp/fifo-parent-%d", i);
 
+                    read(fd_slaves[i], file, 1024*sizeof(char));
+                    
+                    
+                    // pasar al proceso vista
+                    printf("recibido en solve: %s\n", file );
+                    strcat(str_shm, file);
+                    sem_post(sem_id);
+
+                    int fd = open(parent_path, O_WRONLY);
+                    write(fd, files[current_file],100*sizeof(char));
+                    current_file++;
+
+
+                }
+            }
+
+        }
+        else{
+            printf("No data received in return() within 30 seconds.\n");
+        }
     }
-    else{
-        printf("No data within five seconds.\n");
-    }
 
-
+    
 
     return 0;
 
