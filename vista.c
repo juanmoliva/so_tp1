@@ -13,9 +13,11 @@ int fileno(FILE *stream);
 
 int main(void)
 {
-	int bytes_read = 0;
+	long long bytes_read = 0;
 	char pid[6];
 	read(STDIN_FILENO, pid, 6);
+
+	printf("pid leido: %s \n", pid);
 
 	// acceso a memoria compartida con el proceso solve
 	char shm_path[32], sem_path[32];
@@ -44,14 +46,14 @@ int main(void)
         return 1;
     }
 
-	printf("%s\n", vista_char_addr);
+    printf("%s\n", vista_char_addr);
 
 	while(1) {
 		char new_file[1024];
 		strcpy(new_file, vista_char_addr + bytes_read);
 		bytes_read += strlen(new_file);
-		printf("%s\n", new_file) ;
+		printf("%s\n\n", new_file) ;
 		sem_wait(sem_id);
-	}
+	};
 
 }

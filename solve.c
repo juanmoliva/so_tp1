@@ -27,17 +27,19 @@ char *files[MAX_FILES];
 int current_file = 0;
 int files_tosolve = 0;
 
+char *fifo_path[NUM_SLAVES];
 
+void set_fifo_paths();
 
 int main(int argc, char *argv[])
     {
 
-    //Esto no permite que corra SIN recibir parametros
-        /*if ( argc < 2 ) {
+    // Esto no permite que corra SIN recibir parametros
+    if ( argc < 2 ) {
             printf("usage: solve [FILES] \n");
             printf("files must be .cnf\n");
             return 1;
-        }*/
+        }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Tomamos EL PATH DE LA CARPETA QUE CONTIENE LOS ARCHIVOS  ////////////////////////////////////////
@@ -68,16 +70,18 @@ int main(int argc, char *argv[])
 
     while ((pDirent = readdir(pDir)) != NULL) {
 	//Asignamos lugar a los punteros pq tienen por default 10 (es poco)
-        files[i] = malloc(50*sizeof(char));
-        char *full_path = (char *) malloc(100*sizeof(char));
+        files[i] = malloc(1024*sizeof(char));
+        char *full_path = (char *) calloc(4, 100*sizeof(char));
 	
 	//Appendeamos el full path + name
         strcat(full_path,argv[1]);
         strcat(full_path,pDirent->d_name);
 	
 	//Guardamos en files todos los caminos
-        strcpy(files[i++],full_path);
-	    
+        if ( strcmp(pDirent->d_name,".")!=0 && strcmp(pDirent->d_name,"..")!=0 ) {
+            strcpy(files[i++],full_path);
+        }
+        
 	//Contamos cuantos archivos tenemos por resolver
         files_tosolve++;
     }
@@ -90,7 +94,11 @@ int main(int argc, char *argv[])
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    // comunicación y sincronización con el proceso vista.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// comunicación y sincronización con el proceso vista. ////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     char shm_path[32], sem_path[32];
     sprintf(shm_path, "/shm-%d", getpid());
     sprintf(sem_path, "/sem-%d", getpid());
@@ -131,10 +139,17 @@ int main(int argc, char *argv[])
     // imprimimos pid a stdout para el proceso vista
     printf("%d\n", getpid() );
 
-    //Make FIFOS -> Tienen un string que identifica cada pipe (esa es la diferencia con los pipes normales)
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //Make FIFOS -> Tienen un string que identifica cada pipe
     //Creamos 2 pipes por cada esclavo para conectar padre a hijo y viceversa
     	//Les ponemos estos nombres para despues poder referenciarlos desde cada uno de los slaves
-    for(int i = 0; i < NUM_SLAVES ; i++) {
+
+    set_fifo_paths();
+
+    /*for(int i = 0; i < NUM_SLAVES ; i++) {
         char fifo_path_parent[32], fifo_path_slave[32];
         //Le ponemos el nombre y creamos al pipe del parent
         sprintf(fifo_path_parent, "/tmp/fifo-parent-%d", i);
@@ -143,6 +158,15 @@ int main(int argc, char *argv[])
         //Idem para slave
         sprintf(fifo_path_slave, "/tmp/fifo-slave-%d", i);
         mkfifo(fifo_path_slave, 0666);
+    }*/
+
+    for(int i = 0; i < NUM_SLAVES ; i++) {
+        remove(fifo_path[i]);
+        int res = mkfifo(fifo_path[i], 0666);
+        if( res != 0 ) {
+            perror("mkfifo");
+            return 1;
+        }
     }
 
     // armo los buffers iniciales que se enviaran a cada slave
@@ -158,13 +182,16 @@ int main(int argc, char *argv[])
                 current_file++;
             }    
         }
-        printf("we will send '%s' to slave %d \n", buf[i], i );
+        // printf("we will send '%s' to slave %d \n", buf[i], i );
     }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// Create NUM_SLAVES slaves /////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// Create NUM_SLAVES slaves
 	pid_t pid;
-	pid_t slaves_pids[NUM_SLAVES];
+
 	//Creamos el primer slave
 	pid = fork();
 	int j = 0;
@@ -172,37 +199,38 @@ int main(int argc, char *argv[])
 	//Creamos el resto de los slaves y guardamos sus respectivos pid's
 	for(;pid != 0 && j< NUM_SLAVES - 1 ;j++)
 	{ 
-		slaves_pids[j] = pid;
 		pid = fork();
 	 } 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     	
     //Un arreglo donde guardamos los file descriptors (un numero x cada archivo) -> el numero es lo q devuelve open, es el numero q te dio el SO
     int fd_fifos[NUM_SLAVES];
 
 	
     if ( pid != 0 ) {
-	//ACA ENTRA SOLO EL PADRE Y LE MANDA LOS PATHS DE LOS ARCHIVOS A CADA SLAVE!!!!!!!!!!
-	    //Aca guardamos el ultimo pid q no se guardo en el ciclo for
-        slaves_pids[NUM_SLAVES-1] = pid; 
-
+	   //ACA ENTRA SOLO EL PADRE Y LE MANDA LOS PATHS DE LOS ARCHIVOS A CADA SLAVE!!!!!!!!!!
+	    
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
-		    //Armo el path para poder acceder al pipe indicado (creados arriba)
+		    /*//Armo el path para poder acceder al pipe indicado (creados arriba)
             char fifo_path[32];
-            sprintf(fifo_path, "/tmp/fifo-parent-%d", i);
+            sprintf(fifo_path, "/tmp/fifo-parent-%d", i);*/
 
 		    //Te devuelve el int donde tenes que escribir dps
-            fd_fifos[i] = open(fifo_path, O_WRONLY);
+            fd_fifos[i] = open(fifo_path[i] , O_WRONLY);
 
 	       //Escribis en ese respectivo fd, lo que esta en buf con su respectivo tamaño
-            char buf_aux[1024];
-            strcpy(buf_aux, buf[i]);
-            write(fd_fifos[i], buf_aux, 1024*sizeof(char));
+            write(fd_fifos[i], buf[i], sizeof(buf[i]));
+
            //Cierro el archivo.
             close(fd_fifos[i]);
         }
-    } else {        // SLAVES
+    } else { 
+        // SLAVES
 	    
 	    //CREO UN VECTOR DE CHAR CON SU RESPECTIVO ID x CADA SLAVE
         char j_char[32];
@@ -219,12 +247,8 @@ int main(int argc, char *argv[])
         printf("problem with exec\n");
         return 2;
     }
-
-    //A PARTIR DE ACA LABURA SOLO EL PADRE
 	
-    // open slave fifos for reading.
-	printf("Opening slave fifos\n");
-	//Aca se guardan los int que te da el "open" para poder leer.
+	/*//Aca se guardan los int que te da el "open" para poder leer.
     int fd_slaves[NUM_SLAVES];
     	
     //Abre todos los canales de LECTURA de los pipes donde le van a escribir los slaves
@@ -233,31 +257,43 @@ int main(int argc, char *argv[])
         sprintf(fifo_path, "/tmp/fifo-slave-%d", i);
         fd_slaves[i] = open(fifo_path, O_RDONLY);
     }
+*/
+
+    //Abre todos los canales de LECTURA de los pipes donde le van a escribir los slaves
+    for(int i= 0; i<NUM_SLAVES; i++) {
+        fd_fifos[i] = open(fifo_path[i] , O_RDONLY);
+        if (fd_fifos[i] == -1) {
+            perror("open for reading");
+            return -1;
+        }
+    }
 
     // use select() to read from multiple fd's without getting blocked.
     	
     int nfds = 0;
     fd_set rfds;
-    struct timeval tv;
     int retval;
 
     FD_ZERO(&rfds);
     for(int i = 0 ; i < NUM_SLAVES ; i++) {
+        if(fd_fifos[i] > nfds) nfds = fd_fifos[i];
+        FD_SET(fd_fifos[i], &rfds);
+    }
+    
+    /*for(int i = 0 ; i < NUM_SLAVES ; i++) {
         if(fd_slaves[i] > nfds) nfds = fd_slaves[i];
         FD_SET(fd_slaves[i], &rfds);
     }
-    nfds++;
+*/    nfds++;
 /*
     // wait up to 30 seconds
     tv.tv_sec = 30;
     tv.tv_usec = 0;
 */
 
-    printf("antes del while current_file es %d y hay %d files\n", current_file,files_tosolve);
+    // printf("nfds es %d\n", nfds);
     while( current_file < files_tosolve ){
-
-        printf("en el while current_file es %d \n", current_file);
-
+        printf("current_file es %d\n",current_file );
         retval = select(nfds, &rfds, NULL, NULL, NULL);
 
         if (retval == -1) {
@@ -266,39 +302,76 @@ int main(int argc, char *argv[])
         }
         else if (retval){
             for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
-                if(FD_ISSET(fd_slaves[i],&rfds)) {
+                if(FD_ISSET(fd_fifos[i],&rfds)) {
+                    // printf("despues del select, el slave %d esta disponible\n", i);
                     // leer del pipe de esclavo el archivo resuelto
-                    char slave_path[32], parent_path[32];
-                    char *file = (char*) malloc(1024*sizeof(char));
-                    sprintf(slave_path,"/tmp/fifo-slave-%d", i);
-                    sprintf(parent_path,"/tmp/fifo-parent-%d", i);
+                    char *file = (char*) malloc(2048*sizeof(char));
 
-                    read(fd_slaves[i], file, 1024*sizeof(char));
-                    
+                    int read_res = read(fd_fifos[i], file, 2048*sizeof(char));
+                    if(read_res == -1) {
+                        perror("read on select");
+                        return 1;
+                    }
                     
                     // pasar al proceso vista
-                    printf("recibido en solve: %s\n", file );
-                    strcat(str_shm, file);
+                    printf("%s\n", file );
+                    strncat(str_shm, file, strlen(file));
                     sem_post(sem_id);
 
-                    int fd = open(parent_path, O_WRONLY);
-                    write(fd, files[current_file],100*sizeof(char));
+
+                    close(fd_fifos[i]);
+                    fd_fifos[i] = open(fifo_path[i], O_WRONLY);
+
+                    int write_res = write(fd_fifos[i] , files[current_file],strlen(files[current_file]));
+                    if(write_res == -1) {
+                        perror("write on select");
+                        return 1;
+                    }
+
                     current_file++;
 
-                    close(fd);
+                    close(fd_fifos[i]);
+                    fd_fifos[i] = open(fifo_path[i], O_RDONLY);
 
+                    FD_ZERO(&rfds);
+                    for(int i = 0 ; i < NUM_SLAVES ; i++) {
+                        if(fd_fifos[i] > nfds) nfds = fd_fifos[i];
+                        FD_SET(fd_fifos[i], &rfds);
+                    }
+
+                    
 
                 }
             }
 
         }
-       /* else{
-            printf("No data received in return() within 30 seconds.\n");
-        }*/
     }
 
+    // terminacion
+    for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
+        close(fd_fifos[i]);
+        fd_fifos[i] = open(fifo_path[i], O_WRONLY);
+
+        char end[5] = "END";
+        int write_res = write(fd_fifos[i] , end,strlen(end));
+        if(write_res == -1) {
+            perror("write on termination");
+            return 1;
+        }
+
+        close(fd_fifos[i]);
+    }
     
 
     return 0;
 
+}
+
+void set_fifo_paths() {
+    char path[32];
+    for( int i = 0 ; i < NUM_SLAVES ; i++ ){
+        fifo_path[i] = (char *) malloc(32*sizeof(char));
+        sprintf(path,"/tmp/fifos-%d", i);
+        strcpy(fifo_path[i],path);
+    }
 }
