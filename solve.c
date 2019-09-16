@@ -70,8 +70,8 @@ int main(int argc, char *argv[])
 
     while ((pDirent = readdir(pDir)) != NULL) {
 	//Asignamos lugar a los punteros pq tienen por default 10 (es poco)
-        files[i] = malloc(50*sizeof(char));
-        char *full_path = (char *) malloc(100*sizeof(char));
+        files[i] = malloc(1024*sizeof(char));
+        char *full_path = (char *) malloc(1024*sizeof(char));
 	
 	//Appendeamos el full path + name
         strcat(full_path,argv[1]);
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
                 current_file++;
             }    
         }
-        printf("we will send '%s' to slave %d \n", buf[i], i );
+        // printf("we will send '%s' to slave %d \n", buf[i], i );
     }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -290,9 +290,9 @@ int main(int argc, char *argv[])
     tv.tv_usec = 0;
 */
 
-    printf("nfds es %d\n", nfds);
+    // printf("nfds es %d\n", nfds);
     while( current_file < files_tosolve ){
-
+        printf("current_file es %d\n",current_file );
         retval = select(nfds, &rfds, NULL, NULL, NULL);
 
         if (retval == -1) {
@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
         else if (retval){
             for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
                 if(FD_ISSET(fd_fifos[i],&rfds)) {
-                    printf("despues del select, el slave %d esta disponible\n", i);
+                    // printf("despues del select, el slave %d esta disponible\n", i);
                     // leer del pipe de esclavo el archivo resuelto
                     char *file = (char*) malloc(2048*sizeof(char));
 

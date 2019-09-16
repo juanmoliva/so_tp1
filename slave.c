@@ -36,7 +36,7 @@ int solveFile(char *file, char *solved ) {
     FILE* fp;
     char line[128];
     unsigned int size=0;
-    printf("about to execute in %d : '%s'\n", getpid() ,command );
+    // printf("about to execute in %d : '%s'\n", getpid() ,command );
     fp=popen(command,"r");
 
     strcat(solved, file_str);
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     while(current_files > 0) {
         current_files--;
         char *this_file = (char *)malloc(4048*sizeof(char));
-        printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
+        // printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
         solveFile(files_tosolve[current_files], this_file);
         strcat(solved, this_file);
         strcat(solved, "\n");
@@ -129,10 +129,11 @@ int main(int argc, char *argv[])
 
     close(fd);
 
-    char file_loop[512], solved_loop[512];
+    char *file_loop = (char*) malloc(1024*sizeof(char));
+    char *solved_loop = (char*) malloc(1024*sizeof(char));
     int end = 0;
     while(!end) {
-
+        
         // a partir de acá el slave recibe los archivos de a uno
         fd = open(fifo_path, O_RDONLY);
         if (fd == -1) {
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        int read_res = read(fd, file_loop, 512);
+        int read_res = read(fd, file_loop, 1024*sizeof(char));
 
         if (read_res == -1) {
             perror("read on slave in loop");
