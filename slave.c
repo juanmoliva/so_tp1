@@ -64,7 +64,7 @@ int solveFile(char *file, char *solved ) {
       ////////////////////////////////////////// Entra si es el PADRE ////////////////////////////////////////////////////////////////
      else {
          //Feedback de que funciona
-         printf("exec will call minisat %s \n", file );
+         //printf("exec will call minisat %s \n", file );
          
          //El padre no escribe entonces lo cerramos
          close(link[1]);
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
      
     // Guarda en buf lo que le escribio el padre
     read(fd, buf, sizeof(buf));
-    printf("Im slave %d, I received '%s'", identifier, buf);
+    // printf("Im slave %d, I received '%s'", identifier, buf);
 
     
 
@@ -149,17 +149,19 @@ int main(int argc, char *argv[])
     while(!end) {
         // a partir de acá el slave recibe los archivos de a uno
         char *new_file = (char *)malloc(2048*sizeof(char));
-        write(send_fd, solved, 8096*sizeof(char));
+        char test_buf[50] = "mensaje mandado de slave!";
+        // write(send_fd, solved, 8096*sizeof(char));
+        write(send_fd, test_buf, 50);
         int nbytes = read(fd, new_file, 2048*sizeof(char));
         if (nbytes == -1) {
             perror("read file on slave");
             return 1;
         } else if ( nbytes != 0 ){
             solveFile(new_file, solved);
-        }
+        }/*
         else {
             end = 1;
-        }
+        }*/
     }
 
     close(send_fd);

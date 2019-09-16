@@ -9,27 +9,25 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 5
-#define MAX_FILES 50
-#define INITIAL_FILES_FOR_SLAVE 3
+#define NUM_SLAVES 3
+#define MAX_FILES 70
+#define INITIAL_FILES_FOR_SLAVE 2
 
 int ftruncate(int fd, off_t length);
 
 /*
     TO DO
     // error handling
-    // falta aceptar los archivos por linea de comandos.
-*/    // accept dir/* , dir/file.cnf , file.cnf as parameters
+*/
 
 //Vector donde guardamos cada uno de los archivos [GLOBAL]
-//FALTA RECIBIRLOS POR LINEA DE COMANDO
-
-//char *files[12] = {"./files/bart10.shuffled.cnf","./files/bart11.shuffled.cnf","./files/bart12.shuffled.cnf","./files/bart13.shuffled.cnf","./files/bart14.shuffled.cnf","./files/bart15.shuffled.cnf","./files/bart16.shuffled.cnf","./files/bart17.shuffled.cnf","./files/bart18.shuffled.cnf","./files/bart19.shuffled.cnf","./files/bart20.shuffled.cnf","./files/bart21.shuffled.cnf"};
 char *files[MAX_FILES];
 
 //Aca vamos marcando por que archivo vamos del vector
 int current_file = 0;
 int files_tosolve = 0;
+
+
 
 int main(int argc, char *argv[])
     {
@@ -249,13 +247,18 @@ int main(int argc, char *argv[])
         FD_SET(fd_slaves[i], &rfds);
     }
     nfds++;
-
+/*
     // wait up to 30 seconds
     tv.tv_sec = 30;
     tv.tv_usec = 0;
+*/
 
+    printf("antes del while current_file es %d y hay %d files\n", current_file,files_tosolve);
     while( current_file < files_tosolve ){
-        retval = select(nfds, &rfds, NULL, NULL, &tv);
+
+        printf("en el while current_file es %d \n", current_file);
+
+        retval = select(nfds, &rfds, NULL, NULL, NULL);
 
         if (retval == -1) {
             perror("select()");
@@ -282,14 +285,16 @@ int main(int argc, char *argv[])
                     write(fd, files[current_file],100*sizeof(char));
                     current_file++;
 
+                    close(fd);
+
 
                 }
             }
 
         }
-        else{
+       /* else{
             printf("No data received in return() within 30 seconds.\n");
-        }
+        }*/
     }
 
     
