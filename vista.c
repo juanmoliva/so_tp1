@@ -13,7 +13,7 @@ int fileno(FILE *stream);
 
 int main(void)
 {
-	int bytes_read = 0;
+	long long bytes_read = 0;
 	char pid[6];
 	read(STDIN_FILENO, pid, 6);
 
@@ -52,7 +52,7 @@ int main(void)
 		char new_file[1024];
 		strcpy(new_file, vista_char_addr + bytes_read);
 		bytes_read += strlen(new_file);
-		printf("%s\n", new_file) ;
+		printf("%s\n\n", new_file) ;
 		sem_wait(sem_id);
 	};
 

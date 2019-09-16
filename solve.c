@@ -71,15 +71,17 @@ int main(int argc, char *argv[])
     while ((pDirent = readdir(pDir)) != NULL) {
 	//Asignamos lugar a los punteros pq tienen por default 10 (es poco)
         files[i] = malloc(1024*sizeof(char));
-        char *full_path = (char *) malloc(1024*sizeof(char));
+        char *full_path = (char *) calloc(4, 100*sizeof(char));
 	
 	//Appendeamos el full path + name
         strcat(full_path,argv[1]);
         strcat(full_path,pDirent->d_name);
 	
 	//Guardamos en files todos los caminos
-        strcpy(files[i++],full_path);
-	    
+        if ( strcmp(pDirent->d_name,".")!=0 && strcmp(pDirent->d_name,"..")!=0 ) {
+            strcpy(files[i++],full_path);
+        }
+        
 	//Contamos cuantos archivos tenemos por resolver
         files_tosolve++;
     }
@@ -270,7 +272,6 @@ int main(int argc, char *argv[])
     	
     int nfds = 0;
     fd_set rfds;
-    struct timeval tv;
     int retval;
 
     FD_ZERO(&rfds);
@@ -317,6 +318,7 @@ int main(int argc, char *argv[])
                     strncat(str_shm, file, strlen(file));
                     sem_post(sem_id);
 
+
                     close(fd_fifos[i]);
                     fd_fifos[i] = open(fifo_path[i], O_WRONLY);
 
@@ -337,6 +339,7 @@ int main(int argc, char *argv[])
                         FD_SET(fd_fifos[i], &rfds);
                     }
 
+                    
 
                 }
             }

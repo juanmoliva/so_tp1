@@ -60,7 +60,6 @@ int main(int argc, char *argv[])
 {
     // argv[1] is the initial number of files the slave will receive
     // argv[2] is the slave's identifier
-    int initial_files = atoi(argv[1]);
     int identifier = atoi(argv[2]);
 
     set_fifo_path(identifier);
@@ -108,7 +107,7 @@ int main(int argc, char *argv[])
     }
 
 
-    char *solved = (char *)malloc(8096*sizeof(char));
+    char *solved = (char *)calloc( 4,1000*sizeof(char));
 
     // solve the initial files.
 
@@ -121,19 +120,22 @@ int main(int argc, char *argv[])
         strcat(solved, "\n");
     }
 
+
     int res = write(fd, solved, strlen(solved));
     if ( res == -1 ){
         perror("write in slave");
         return 1;
     }
 
+    
     close(fd);
 
+    
     char *file_loop = (char*) malloc(1024*sizeof(char));
     char *solved_loop = (char*) malloc(1024*sizeof(char));
-    int end = 0;
-    while(!end) {
+    while(1) {
         
+
         // a partir de acá el slave recibe los archivos de a uno
         fd = open(fifo_path, O_RDONLY);
         if (fd == -1) {
@@ -193,6 +195,8 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+
+ 
 void set_fifo_path( int identifier ) {
     sprintf( fifo_path, "/tmp/fifos-%d", identifier );
     return;
