@@ -46,26 +46,41 @@ int main(int argc, char *argv[])
 /////////////////////////////// x argv y guardamos los nombre de archivos en variable: files ////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
+    //Variables para manejo de directorios
     struct dirent * pDirent;
     DIR * pDir;
+	
 
+    //Abrimos el directorio 
     pDir = opendir (argv[1]);
-
+	
+    //Creamos vector donde van a estar todos los PATHS ABSOLUTOS de los archivos a resolver	
     char * files[MAX_FILES];
-
+    
+    //Validamos que no de error
     if (pDir == NULL) {
         printf ("Cannot open directory '%s'\n", argv[1]);
         return 1;
     }
 
     int i = 0;
+    // readdir devuelve el primer archivo del directorio cada vez que se asigna
+    // Le asignamos a pDirent cada uno de los directorios en cada iteracion 
+    // y le agregamos lo recibido por argv para tener el full path
 
     while ((pDirent = readdir(pDir)) != NULL) {
+	//Asignamos lugar a los punteros pq tienen por default 10 (es poco)
         files[i] = malloc(50*sizeof(char));
         char *full_path = (char *) malloc(100*sizeof(char));
+	
+	//Appendeamos el full path + name
         strcat(full_path,argv[1]);
         strcat(full_path,pDirent->d_name);
+	
+	//Guardamos en files todos los caminos
         strcpy(files[i++],full_path);
+	    
+	//Contamos cuantos archivos tenemos por resolver
         files_tosolve++;
     }
 
@@ -75,6 +90,7 @@ int main(int argc, char *argv[])
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
     // comunicación y sincronización con el proceso vista.
     char shm_path[32], sem_path[32];
@@ -132,9 +148,11 @@ int main(int argc, char *argv[])
     }
 
     // armo los buffers iniciales que se enviaran a cada slave
-    char *buf[NUM_SLAVES];
+    char buf[NUM_SLAVES][1024];
+
     for(int i = 0 ; i < NUM_SLAVES; i++){
-        buf[i] = (char *) malloc(1024*sizeof(char));
+        // buf[i] = (char *) malloc(1024*sizeof(char));
+
         for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
             if(current_file < sizeof(files) ){
                 strcat(buf[i], files[current_file]);
@@ -232,8 +250,8 @@ int main(int argc, char *argv[])
     }
     nfds++;
 
-    // wait up to 5 seconds
-    tv.tv_sec = 5;
+    // wait up to 30 seconds
+    tv.tv_sec = 30;
     tv.tv_usec = 0;
 
 
@@ -252,6 +270,7 @@ int main(int argc, char *argv[])
                 
                 
                 // pasar al proceso vista
+                printf("recibido en solve: %s\n", file );
                 strcat(str_shm, file);
                 sem_post(sem_id);
             }
