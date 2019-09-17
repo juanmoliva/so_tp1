@@ -144,7 +144,9 @@ int main(int argc, char *argv[])
             return 1;
         } 
 
-        if ( strcmp(file_loop,"END") == 0 ) {
+        printf("strncmp entre %s y  'END' es %d\n",file_loop,strncmp(file_loop,"END",3));
+
+        if ( strncmp(file_loop,"END",3) == 0 ) {
             printf("in slave %d we reached termination\n", identifier);
             close(fd_read);
             close(fd_write);

@@ -9,9 +9,9 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 1
+#define NUM_SLAVES 3
 #define MAX_FILES 70
-#define INITIAL_FILES_FOR_SLAVE 2
+#define INITIAL_FILES_FOR_SLAVE 3
 
 int ftruncate(int fd, off_t length);
 
@@ -21,7 +21,7 @@ int ftruncate(int fd, off_t length);
 */
 
 //Vector donde guardamos cada uno de los archivos [GLOBAL]
-char *files[MAX_FILES];
+char *files[ MAX_FILES + NUM_SLAVES];
 
 //Aca vamos marcando por que archivo vamos del vector
 int current_file = 0;
@@ -92,7 +92,17 @@ int main(int argc, char *argv[])
         }
 
     }
-	
+
+    // last "fils" are "END" string literals.
+    char end[4] = "END";
+    for( int k = 0 ; k<NUM_SLAVES ; k++) {
+        files[i] = (char *) calloc(1, 32*sizeof(char));
+        strncpy(files[i], end,4);
+        printf("files[i] es %s\n", files[i]);
+        files_tosolve++;
+        i++;
+    } 
+    
 
 
     closedir (pDir);
@@ -343,12 +353,25 @@ int main(int argc, char *argv[])
                     }
 
                     
-
+                    free(file);
                 }
             }
 
         }
     }
+
+    /*// receive last files sended char 
+    char *last_file = (char*) malloc(1024*sizeof(char));
+    memset(last_file, 0, 1024*sizeof(char));
+
+    int read_res = read(fd_read_fifos[i], last_file, 1024*sizeof(char));
+    if(read_res == -1) {
+            perror("read on select");
+            return 1;
+    }
+
+    free(last_file);
+*/
 
     // terminacion
     for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
