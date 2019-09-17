@@ -16,7 +16,8 @@ char *files_tosolve[100];
 int current_files = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-char fifo_path[32];
+char fifo_write_path[32];
+char fifo_read_path[32];
 
 FILE *popen(const char *command, const char *type);
 int pclose(FILE *stream);
@@ -28,11 +29,12 @@ int pclose(FILE *stream);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int solveFile(char *file, char *solved ) {
+    // printf("entered solveFile, to solve %s\n", file );
     char pid[50], file_str[100];
     sprintf(pid, "pid of the slave is %d\n", getpid());
     sprintf(file_str, "the file '%s' was solved\n", file);
     char command[200];
-    sprintf(command, "minisat %s | grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT' 2>/dev/null", file);
+    sprintf(command, "minisat %s | grep -e  'Number of variables' -e 'Number of clauses' -e 'CPU time' -e 'SAT' &>/dev/null", file);
     FILE* fp;
     char line[128];
     unsigned int size=0;
@@ -41,7 +43,7 @@ int solveFile(char *file, char *solved ) {
 
     strcat(solved, file_str);
     strcat(solved,pid);
-    
+    printf("en solveFile solved es: ' %s ' \n", solved);
     while (fgets(line,sizeof(line),fp))
         {
         size+=strlen(line);
@@ -58,9 +60,8 @@ int solveFile(char *file, char *solved ) {
 
 int main(int argc, char *argv[])
 {
-    // argv[1] is the initial number of files the slave will receive
-    // argv[2] is the slave's identifier
-    int identifier = atoi(argv[2]);
+    // argv[1] is the slave's identifier
+    int identifier = atoi(argv[1]);
 
     set_fifo_path(identifier);
 
@@ -75,8 +76,8 @@ int main(int argc, char *argv[])
     int fd  = open(fifo_parent_path, O_RDONLY);*/
 
     // abrimos fifo para lectura
-    int fd = open(fifo_path, O_RDONLY);
-    if ( fd == -1 ){
+    int fd_read = open(fifo_read_path, O_RDONLY);
+    if ( fd_read == -1 ){
         perror( "open fifo in slave");
         return 1;
     }
@@ -85,17 +86,15 @@ int main(int argc, char *argv[])
     char buf[1024];
      
     // Guarda en buf lo que le escribio el padre
-    read(fd, buf, sizeof(buf));
+    read(fd_read, buf, sizeof(buf));
 
 
     // printf("Im slave %d, I received '%s'", identifier, buf);
 
-    close(fd);
-
     /*// open fifo for writing
     int send_fd = open(fifo_slave_path, O_WRONLY);*/
 
-    fd = open(fifo_path, O_WRONLY);
+    int fd_write = open(fifo_write_path, O_WRONLY);
 
     char *file = strtok (buf,";");
     while (file!= NULL){
@@ -113,7 +112,8 @@ int main(int argc, char *argv[])
 
     while(current_files > 0) {
         current_files--;
-        char *this_file = (char *)malloc(4048*sizeof(char));
+        char *this_file = (char *)malloc(2048*sizeof(char));
+        memset(this_file,0,2048*sizeof(char));
         // printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
         solveFile(files_tosolve[current_files], this_file);
         strcat(solved, this_file);
@@ -121,30 +121,24 @@ int main(int argc, char *argv[])
     }
 
 
-    int res = write(fd, solved, strlen(solved));
-    if ( res == -1 ){
+    int res_write = write(fd_write, solved, strlen(solved));
+    if ( res_write == -1 ){
         perror("write in slave");
         return 1;
     }
-
     
-    close(fd);
-
     
-    char *file_loop = (char*) malloc(1024*sizeof(char));
-    char *solved_loop = (char*) malloc(1024*sizeof(char));
+
     while(1) {
-        
+        char *file_loop = (char*) malloc(1024*sizeof(char));
+        memset(file_loop,0,1024*sizeof(char));
+        char *solved_loop = (char*) malloc(1024*sizeof(char));
+        memset(solved_loop,0,1024*sizeof(char));
 
         // a partir de acá el slave recibe los archivos de a uno
-        fd = open(fifo_path, O_RDONLY);
-        if (fd == -1) {
-            perror("open in slave loop");
-            return -1;
-        }
 
-        int read_res = read(fd, file_loop, 1024*sizeof(char));
-
+        int read_res = read(fd_read , file_loop, 1024*sizeof(char));
+        // printf("read %d bytes, I read this: %s \n", read_res, file_loop);
         if (read_res == -1) {
             perror("read on slave in loop");
             return 1;
@@ -152,27 +146,23 @@ int main(int argc, char *argv[])
 
         if ( strcmp(file_loop,"END") == 0 ) {
             printf("in slave %d we reached termination\n", identifier);
-            close(fd);
+            close(fd_read);
+            close(fd_write);
             break;
         }
-        close(fd);
 
         // solve file read on fifo and send in on solved.
         solveFile(file_loop, solved_loop);
 
-        fd = open(fifo_path, O_WRONLY);
-        if (fd == -1) {
-            perror("open in slave loop");
-            return 1;
-        }
-
-        int write_res = write(fd, solved_loop, strlen(solved_loop));
+        printf("sending to solve: %s\n", solved_loop);
+        int write_res = write(fd_write, solved_loop, strlen(solved_loop));
         if(write_res == -1) {
             perror("write on slave in loop");
             return 1;
         }
 
-        close(fd);
+        free(file_loop);
+        free(solved_loop);
 
         /*// write(send_fd, solved, 8096*sizeof(char));
         write(send_fd, test_buf, 50);
@@ -189,8 +179,11 @@ int main(int argc, char *argv[])
         }*/
     }
 
+    printf("out of loop in slave %d\n",identifier );
 
-    close(fd);
+
+    close(fd_write);
+    close(fd_read);
 
     return 0;
 }
@@ -198,6 +191,7 @@ int main(int argc, char *argv[])
 
  
 void set_fifo_path( int identifier ) {
-    sprintf( fifo_path, "/tmp/fifos-%d", identifier );
+    sprintf( fifo_write_path, "/tmp/fifos-slave-%d", identifier );
+    sprintf( fifo_read_path, "/tmp/fifos-parent-%d", identifier );
     return;
 }
