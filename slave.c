@@ -43,7 +43,6 @@ int solveFile(char *file, char *solved ) {
 
     strcat(solved, file_str);
     strcat(solved,pid);
-    printf("en solveFile solved es: ' %s ' \n", solved);
     while (fgets(line,sizeof(line),fp))
         {
         size+=strlen(line);
@@ -55,25 +54,12 @@ int solveFile(char *file, char *solved ) {
     return 0;
 }
 
-
-
-
 int main(int argc, char *argv[])
 {
     // argv[1] is the slave's identifier
     int identifier = atoi(argv[1]);
 
     set_fifo_path(identifier);
-
-    // printf("hello from slave , %d files to receive. My identifier is %d \n", initial_files, identifier );
-
-    /*// Asignamos respectivo id a los nombres del pipe
-    char fifo_parent_path[32], fifo_slave_path[32];
-    sprintf(fifo_parent_path, "/tmp/fifo-parent-%d", identifier);
-    sprintf(fifo_slave_path, "/tmp/fifo-slave-%d", identifier);*/
-     
-    /*// Abrimos pipe de lectura del padre y guardamos el int q devuelve
-    int fd  = open(fifo_parent_path, O_RDONLY);*/
 
     // abrimos fifo para lectura
     int fd_read = open(fifo_read_path, O_RDONLY);
@@ -88,46 +74,39 @@ int main(int argc, char *argv[])
     // Guarda en buf lo que le escribio el padre
     read(fd_read, buf, sizeof(buf));
 
-
-    // printf("Im slave %d, I received '%s'", identifier, buf);
-
-    /*// open fifo for writing
-    int send_fd = open(fifo_slave_path, O_WRONLY);*/
-
     int fd_write = open(fifo_write_path, O_WRONLY);
 
+    // los archivos inciales se reciben en un unico buffer separados por puntos y coma ( ; )
+    // ahora se separan y se van guardando en el array files_tosolve[].
     char *file = strtok (buf,";");
     while (file!= NULL){
         files_tosolve[current_files] = file;
-        // printf("slave, %d, file %d, %s\n", identifier, current_files, files_tosolve[current_files] );
-        
         current_files++;
         file = strtok (NULL, ";");
     }
 
-
     char *solved = (char *)calloc( 4,1000*sizeof(char));
 
-    // solve the initial files.
+    // resolvemos los archivos iniciales.
 
     while(current_files > 0) {
         current_files--;
         char *this_file = (char *)malloc(2048*sizeof(char));
         memset(this_file,0,2048*sizeof(char));
-        // printf("slave %d, solving %s \n", identifier, files_tosolve[current_files]);
         solveFile(files_tosolve[current_files], this_file);
         strcat(solved, this_file);
         strcat(solved, "\n");
+        free(this_file);
     }
 
-
+    // mandamos al proceso solve los archivos iniciales resueltos.
     int res_write = write(fd_write, solved, strlen(solved));
     if ( res_write == -1 ){
         perror("write in slave");
         return 1;
     }
     
-    
+    free(solved);
 
     while(1) {
         char *file_loop = (char*) malloc(1024*sizeof(char));
@@ -144,7 +123,9 @@ int main(int argc, char *argv[])
             return 1;
         } 
 
-        if ( strcmp(file_loop,"END") == 0 ) {
+        //printf("strncmp entre %s y  'END' es %d\n",file_loop,strncmp(file_loop,"END",3));
+
+        if ( strncmp(file_loop,"END",3) == 0 ) {
             printf("in slave %d we reached termination\n", identifier);
             close(fd_read);
             close(fd_write);
@@ -154,7 +135,7 @@ int main(int argc, char *argv[])
         // solve file read on fifo and send in on solved.
         solveFile(file_loop, solved_loop);
 
-        printf("sending to solve: %s\n", solved_loop);
+        printf("sending to solve from slave %d : %s\n", identifier ,solved_loop);
         int write_res = write(fd_write, solved_loop, strlen(solved_loop));
         if(write_res == -1) {
             perror("write on slave in loop");
