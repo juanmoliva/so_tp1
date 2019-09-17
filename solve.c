@@ -9,9 +9,9 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 5
+#define NUM_SLAVES 2
 #define MAX_FILES 70
-#define INITIAL_FILES_FOR_SLAVE 2
+#define INITIAL_FILES_FOR_SLAVE 5
 
 int ftruncate(int fd, off_t length);
 
@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    // armamos los buffers iniciales que se enviaran a cada slave
+   /* // armamos los buffers iniciales que se enviaran a cada slave
     char buf[NUM_SLAVES][1024];
 
     for(int i = 0 ; i < NUM_SLAVES; i++){
@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
                 current_file++;
             }    
         }
-    }
+    }*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// Create NUM_SLAVES slaves /////////////////////////////////////////////////////////////////
@@ -221,8 +221,19 @@ int main(int argc, char *argv[])
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
+            char* buf = (char *)calloc(INITIAL_FILES_FOR_SLAVE, 512*sizeof(char *));
+            for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
+                if(current_file < (files_tosolve- NUM_SLAVES) ){
+                    printf("current_file %d y (files_tosolve-NUM_SLAVES) %d\n", current_file, (files_tosolve- NUM_SLAVES));
+                    strncat(buf, files[current_file], strlen(files[current_file]));
+                    strcat(buf,";");
+                    current_file++;
+                }    
+            }
+
             fd_write_fifos[i] = open(fifo_write_path[i] , O_WRONLY);
-            write(fd_write_fifos[i], buf[i], strlen(buf[i]));
+            write(fd_write_fifos[i], buf, strlen(buf));
+            free(buf);
         }
     } else { 
         // slaves
