@@ -22,10 +22,8 @@ char fifo_read_path[32];
 FILE *popen(const char *command, const char *type);
 int pclose(FILE *stream);
 
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////// Resuelve el archivo - Le pasamos un puntero al archivo y un puntero para que deje la rta  //////
+//////////////////// SolveFile. Resuelve el archivo - Le pasamos un puntero al archivo y un puntero para que deje la rta  //////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int solveFile(char *file, char *solved ) {
@@ -41,11 +39,10 @@ int solveFile(char *file, char *solved ) {
 
     strcat(solved, file_str);
     strcat(solved,pid);
-    while (fgets(line,sizeof(line),fp))
-        {
-        size+=strlen(line);
-        strcat(solved,line);
-        }
+    while (fgets(line,sizeof(line),fp)) {
+    size+=strlen(line);
+    strcat(solved,line);
+    }
 
     fclose(fp);
     
