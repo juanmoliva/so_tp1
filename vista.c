@@ -59,18 +59,14 @@ int main(void)
 		token = strtok(current,"&&&");
     	for (int i= 0 ; i< loop; i++) { token = strtok(NULL,"&&&");}
     	
-
-    	printf("%s\n", token);
     	if (strcmp(token, "ENDSHM") == 0){
     		break;
     	}
+    	printf("%s\n", token);
     	loop++;
     	sem_wait(sem_id);
 
     	free(current);
-    	free(token);
-    	
-
 	}
 
 	return 0;
