@@ -31,7 +31,7 @@ int main(void)
 		return 1;
 	}
 	// mapeo de memoria.
-	void *vista_addr = mmap(NULL, 50*1024, PROT_WRITE, MAP_SHARED, fd, 0);
+	void *vista_addr = mmap(NULL, MAX_FILES*2048, PROT_WRITE, MAP_SHARED, fd, 0);
 	if (vista_addr == MAP_FAILED)
 	{
 		perror("mmap in vista");
@@ -46,14 +46,70 @@ int main(void)
         return 1;
     }
 
-    printf("%s\n", vista_char_addr);
+    sem_wait(sem_id);
 
-	while(1) {
-		char new_file[1024];
-		strcpy(new_file, vista_char_addr + bytes_read);
-		bytes_read += strlen(new_file);
-		printf("%s\n\n", new_file) ;
+    int loop = 0;
+    while( 1 ) {
+    	printf("NEW LOOP !!!! \n");
+		char *current = calloc(1,2048*sizeof(char *));
+		char *token = calloc(1,1024*sizeof(char *));
+		strcpy(current, vista_char_addr);
+		token = strtok(current,"&&&");
+    	for (int i= 0 ; i< loop; i++) { token = strtok(NULL,"&&&");}
+    	printf("loop es: %d\n", loop);
+    	printf("token quedo: '%s'\n", token);
+    	if (strcmp(token, "ENDSHM") == 0){
+    		printf("finalizando memoria\n");
+    		break;
+    	}
+    	loop++;
+    	sem_wait(sem_id);
+    	
+
+	}
+
+	return 0;
+    /*int loop = 0;
+    
+    while( loop <= 7) {
+    	printf("NEW LOOP !!!! \n");
+    	char* outputs[MAX_FILES];
+    	int i = 0;
+	    outputs[i] = strtok (vista_char_addr,"&&&");
+	    while ( outputs[i] != NULL){
+	    	printf("%s\n", outputs[i]);
+	        i++;
+	        outputs[i] = strtok (NULL, ";");
+	    }
+	    sem_wait(sem_id);
+    	loop++;
+    	
+    	int count=1;
+    	char *str = (char *) calloc(4, 512*sizeof(char*));
+    	str = strtok(vista_char_addr,"&&&");
+    	for (int i= 0 ; i< loop; i++) { str = strtok(NULL,"&&&"); count++;}
+    	printf("count es: %d\n", count);
+    	printf("str quedo: '%s'\n", str );
+    	
+    }*/
+    
+
+    /*char *file = strtok (vista_char_addr,"&&&");
+    printf("%s\n", file);
+
+    int running = 1;
+	while(running) {
 		sem_wait(sem_id);
-	};
+		char *file = strtok (NULL,"&&&");
+		if( strcmp(file,"ENDSHM")==0){ running = 0; }
+		else { printf("%s\n\n", file); }
+		//strcpy(new_file, vista_char_addr + bytes_read);
+		//bytes_read += strlen(new_file);
+		
+		
+	};*/
+
+
+	
 
 }

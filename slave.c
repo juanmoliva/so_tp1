@@ -29,7 +29,6 @@ int pclose(FILE *stream);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int solveFile(char *file, char *solved ) {
-    // printf("entered solveFile, to solve %s\n", file );
     char pid[50], file_str[100];
     sprintf(pid, "pid of the slave is %d\n", getpid());
     sprintf(file_str, "the file '%s' was solved\n", file);
@@ -38,7 +37,6 @@ int solveFile(char *file, char *solved ) {
     FILE* fp;
     char line[128];
     unsigned int size=0;
-    // printf("about to execute in %d : '%s'\n", getpid() ,command );
     fp=popen(command,"r");
 
     strcat(solved, file_str);
@@ -117,16 +115,12 @@ int main(int argc, char *argv[])
         // a partir de acá el slave recibe los archivos de a uno
 
         int read_res = read(fd_read , file_loop, 1024*sizeof(char));
-        // printf("read %d bytes, I read this: %s \n", read_res, file_loop);
         if (read_res == -1) {
             perror("read on slave in loop");
             return 1;
         } 
 
-        //printf("strncmp entre %s y  'END' es %d\n",file_loop,strncmp(file_loop,"END",3));
-
         if ( strncmp(file_loop,"END",3) == 0 ) {
-            printf("in slave %d we reached termination\n", identifier);
             close(fd_read);
             close(fd_write);
             break;
@@ -135,7 +129,6 @@ int main(int argc, char *argv[])
         // solve file read on fifo and send in on solved.
         solveFile(file_loop, solved_loop);
 
-        printf("sending to solve from slave %d : %s\n", identifier ,solved_loop);
         int write_res = write(fd_write, solved_loop, strlen(solved_loop));
         if(write_res == -1) {
             perror("write on slave in loop");
@@ -144,23 +137,7 @@ int main(int argc, char *argv[])
 
         free(file_loop);
         free(solved_loop);
-
-        /*// write(send_fd, solved, 8096*sizeof(char));
-        write(send_fd, test_buf, 50);
-        int nbytes = read(fd, new_file, 2048*sizeof(char));
-        if (nbytes == -1) {
-            perror("read file on slave");
-            return 1;
-        } else if ( nbytes != 0 ){
-            solveFile(new_file, solved);
-        }*/
-        /*
-        else {
-            end = 1;
-        }*/
     }
-
-    printf("out of loop in slave %d\n",identifier );
 
 
     close(fd_write);

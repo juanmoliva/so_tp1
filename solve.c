@@ -9,9 +9,11 @@
 #include <string.h>
 #include <semaphore.h>
 #include <dirent.h>
-#define NUM_SLAVES 2
+#define NUM_SLAVES 4
+// soportado hasta 4 slaves
 #define MAX_FILES 70
-#define INITIAL_FILES_FOR_SLAVE 5
+#define INITIAL_FILES_FOR_SLAVE 3
+// soportado hasta 3 archivos por esclavo.
 
 int ftruncate(int fd, off_t length);
 
@@ -47,16 +49,18 @@ int main(int argc, char *argv[])
     //Variables para manejo de directorios
     struct dirent * pDirent;
     DIR * pDir;
+    char *dir_param = (char*)calloc(1, 512*sizeof(char));
+    strncpy( dir_param ,argv[1], strlen(argv[1]));
 	
     //Abrimos el directorio 
-    pDir = opendir (argv[1]);
+    pDir = opendir (dir_param);
 	
     //Creamos vector donde van a estar todos los PATHS ABSOLUTOS de los archivos a resolver	
     char * files[MAX_FILES];
     
     //Validamos que no de error
     if (pDir == NULL) {
-        printf ("Cannot open directory '%s'\n", argv[1]);
+        printf ("Cannot open directory '%s'\n",dir_param);
         return 1;
     }
     
@@ -68,12 +72,9 @@ int main(int argc, char *argv[])
     while ((pDirent = readdir(pDir)) != NULL) {
         if( strcmp(pDirent->d_name,".")!=0 && strcmp(pDirent->d_name,"..")!=0 ){
             //Asignamos lugar a los punteros pq tienen por default 10 (es poco)
-        char *full_path = (char *)malloc( 512 *sizeof(char));
-        memset(full_path, 0, 512 *sizeof(char));
-
-        
+        char *full_path = (char *)calloc(1 ,512 *sizeof(char));
         //Appendeamos el full path + name
-            strcat(full_path,argv[1]);
+            strcat(full_path,dir_param);
             strcat(full_path,pDirent->d_name);
         
         //Guardamos en files todos los caminos
@@ -99,7 +100,7 @@ int main(int argc, char *argv[])
         i++;
     } 
     
-
+    free(dir_param);
     closedir (pDir);
     
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,14 +126,14 @@ int main(int argc, char *argv[])
     }
 
     // aumentar tamaño de shared memory
-    int res_truncate = ftruncate(fd_shm, MAX_FILES * 1024);
+    int res_truncate = ftruncate(fd_shm, MAX_FILES * 2024);
     if (res_truncate == -1)
     {
         perror("ftruncate");
         return 1;
         }
     	
-    void *addr_shm = mmap(NULL, MAX_FILES * 1024, PROT_WRITE, MAP_SHARED, fd_shm, 0);
+    void *addr_shm = mmap(NULL, MAX_FILES * 2024, PROT_WRITE, MAP_SHARED, fd_shm, 0);
     if (addr_shm == MAP_FAILED)
     {
         perror("mmap");
@@ -176,19 +177,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // armamos los buffers iniciales que se enviaran a cada slave
-    char buf[NUM_SLAVES][1024];
-
-    for(int i = 0 ; i < NUM_SLAVES; i++){
-        for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
-            if(current_file < files_tosolve ){
-                strcat(buf[i], files[current_file]);
-                strcat(buf[i],";");
-                current_file++;
-            }    
-        }
-    }
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// Create NUM_SLAVES slaves /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,8 +209,19 @@ int main(int argc, char *argv[])
         // write to FIFO's
         // distribute initial files to slaves
         for(int i = 0; i < NUM_SLAVES ; i++) {
+            char* buf = (char *)calloc(INITIAL_FILES_FOR_SLAVE, 512*sizeof(char *));
+            for( int j = 0; j< INITIAL_FILES_FOR_SLAVE ; j++) {
+                if(current_file < (files_tosolve- NUM_SLAVES) ){
+                    strncat(buf, files[current_file], strlen(files[current_file]));
+                    strcat(buf,";");
+                    current_file++;
+                }    
+            }
+
             fd_write_fifos[i] = open(fifo_write_path[i] , O_WRONLY);
-            write(fd_write_fifos[i], buf[i], strlen(buf[i]));
+            printf("mandamos '%s' al slave %d\n",buf,i );
+            write(fd_write_fifos[i], buf, strlen(buf));
+            free(buf);
         }
     } else { 
         // slaves
@@ -275,39 +274,37 @@ int main(int argc, char *argv[])
 
     while( current_file < files_tosolve ){
         retval = select(nfds, &rfds, NULL, NULL, NULL);
-        printf("loop_test es %d, retval es %d\n current_file es %d y files_tosolve %d.\n", loop_test,retval,current_file,files_tosolve );
-        
 
         if (retval == -1) {
             perror("select()");
             return 1;
         }
         else {
+
+
             for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
                 if(slaves_working[i] && FD_ISSET(fd_read_fifos[i],&rfds)) {
-                    // printf("despues del select, el slave %d esta disponible\n", i);
                     // leer del pipe de esclavo el archivo resuelto
-                    printf("en loop %d,slave %d tiene algo para leer\n",loop_test,i);
-                    char *file = (char*) malloc(1024*sizeof(char));
-                    memset(file, 0, 1024*sizeof(char));
+                    char *file = (char*) malloc(1024*INITIAL_FILES_FOR_SLAVE*sizeof(char));
+                    memset(file, 0, 1024*INITIAL_FILES_FOR_SLAVE*sizeof(char));
 
-                    int read_res = read(fd_read_fifos[i], file, 1024*sizeof(char));
+                    int read_res = read(fd_read_fifos[i], file, 1024*INITIAL_FILES_FOR_SLAVE*sizeof(char));
                     if(read_res == -1) {
                         perror("read on select");
                         return 1;
                     }
                     
-                    // pasar al proceso vista
-                    printf("read after select:\n %s\n", file );
-                    strncat(str_shm, file, strlen(file));
-                    sem_post(sem_id);
+                    // pasar al proceso vista. el string "&&&" se utiliza como delimitador.
+                    strcat(str_shm, file);
+                    
+                    printf("slave %d ,string: %s\n", i,file);
+                    
 
                     int write_res = write(fd_write_fifos[i] , files[current_file],strlen(files[current_file]));
                     if(write_res == -1) {
                         perror("write on select");
                         return 1;
                     }
-                    printf("al slave %d le mandamos %s\n",i,files[current_file]);
 
                     // si mandamos el string "END" a un slave, no queremos que ese slave esté en el proximo select().
                     if (strcmp(files[current_file],"END") == 0) { slaves_working[i] = 0; }
@@ -330,36 +327,25 @@ int main(int argc, char *argv[])
                 }
             }
 
+            
         }
+        
         loop_test++;
 
+        strcat(str_shm, "&&&");
+        
+        printf("%s\n",str_shm );
+        sem_post(sem_id);
     }
 
-    /*// receive last files sended char 
-    char *last_file = (char*) malloc(1024*sizeof(char));
-    memset(last_file, 0, 1024*sizeof(char));
+    strcat(str_shm, "ENDSHM");
+    strcat(str_shm, "&&&");
+    sem_post(sem_id);
 
-    int read_res = read(fd_read_fifos[i], last_file, 1024*sizeof(char));
-    if(read_res == -1) {
-            perror("read on select");
-            return 1;
-    }
-
-    free(last_file);
-*/
 
     // terminacion
     for( int i = 0 ; i < NUM_SLAVES ; i++ ) {
-        printf("enter termination on solve\n");
         close(fd_read_fifos[i]);
-/*
-        char end[5] = "END";
-        int write_res = write(fd_write_fifos[i] , end,strlen(end));
-        if(write_res == -1) {
-            perror("write on termination");
-            return 1;
-        }*/
-
         close(fd_write_fifos[i]);
     }
     
